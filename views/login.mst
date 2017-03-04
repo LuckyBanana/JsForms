@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- The above 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->
+    <meta name="description" content="">
+    <meta name="author" content="">
+    <link rel="icon" href="favicon.ico">
+    <title>Log in</title>
+    <link href="/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/bootstrap/css/bootstrap-theme.min.css" rel="stylesheet">
+    <link href="./css/signin.css" rel="stylesheet">
+  </head>
+  <body>
+    <div id="main" class="container">
+      {{{errs}}}
+      <form name="loginForm" class="form-signin" action="/login" method="post" onsubmit="return crypt()">
+        <h2 class="form-signin-heading">Please sign in</h2>
+        <label for="inputUsername" class="sr-only">Username</label>
+        <input id="inputUsername" class="form-control" placeholder="Username" required autofocus name="username">
+        <label for="inputPassword" class="sr-only">Password</label>
+        <input type="password" id="inputPassword" class="form-control" placeholder="Password" required name="password">
+        <button class="btn btn-lg btn-primary btn-block" type="submit">Sign in</button>
+      </form>
+    </div>
+    <script src="/js/c.js"></script>
+    <script type="text/javascript">
+      function crypt() {
+        document.loginForm.password.value = CryptoJS.SHA256(document.loginForm.password.value).toString(CryptoJS.enc.Base64);
+      }
+    </script>
+  </body>
+</html>

@@ -1,0 +1,30 @@
+{
+	"Database" : {
+		 "Client" : "sqlite",
+		 "Connection" : {
+			 "ConfigDb" : "conf.db",
+			 "StorageDb" : "storage.db"
+		 }
+	},
+	"App" : {
+		"Name" : "PUT APP NAME HERE",
+		"Host" : "localhost",
+		"HttpPort" : "1337",
+		"Mode" : "DEV",
+		"DatabaseDriver" : "sqlite"
+	},
+	"Https" : {
+		/*"Port" : "1338",*/
+		"CertFile" : "dev-cert.pem",
+		"KeyFile" : "dev-key.pem"
+	},
+	"CORS" : {
+		"AllowedHosts" : ["*"],
+		"AllowedMethods" : ["GET"]
+	},
+	"CustomRoutes" : [],
+	"Clustering" : {
+		"MaxCpus" : "8"
+	},
+	"Authentication": "default"
+}

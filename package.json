@@ -29,6 +29,7 @@
     "draft-js": "^0.9.1",
     "draft-js-editor": "^1.8.4",
     "express": "4.13.1",
+    "express-jwt": "^5.1.0",
     "express-session": "~1.11.3",
     "express-useragent": "^0.2.4",
     "finalhandler": "0.4.0",

@@ -235,7 +235,7 @@ const startServer = (configFile) => {
 	const app = express()
 	const releases = multer({dest: __dirname + '/uploads/releases'})
 
-	const DbLib = require('.' + configFile.databaseLib)
+	const DbLib = require(configFile.databaseLib)
 	const auth = jwt({ secret: 'jsforms' })
 
 	DbLib.openDb(configFile.databaseSystem, config)
@@ -301,7 +301,7 @@ const loadConfigFile = _ => {
 		serverIp : config.get('App.Host'),
 		httpPort : config.get('App.HttpPort'),
 		devMode : config.has('App.Mode') && (config.get('App.Mode') == 'DEV'),
-		databaseLib : require('path').join('/', 'libs', 'db', config.get('App.DatabaseDriver') + '.js'),
+		databaseLib : require('path').join(__dirname, 'libs', 'db', config.get('App.DatabaseDriver') + '.js'),
 		allowedRemoteHosts : config.get('CORS.AllowedHosts'),
 		allowedRemoteMethods : config.get('CORS.AllowedMethods'),
 		databaseSystem : config.get('Database.Client'),

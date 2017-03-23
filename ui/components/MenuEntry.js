@@ -1,6 +1,6 @@
 import React from 'react'
 
-export class MenuEntry extends React.Component {
+export default class MenuEntry extends React.Component {
   constructor(props) {
     super(props)
     this.handleClick = this.handleClick.bind(this)
@@ -13,15 +13,19 @@ export class MenuEntry extends React.Component {
   render() {
     if (this.props.insideGroup) {
       return (
-        <a className="list-group-item" onClick={this.handleClick}>{this.props.label}</a>
+        <a className="list-group-item" onClick={this.handleClick}>
+          {this.props.label}
+        </a>
       )
     }
     else {
       return (
-        <li className={this.props.active}><a href="#" onClick={this.handleClick}>{this.props.label}</a></li>
+        <li className={this.props.active}>
+          <a href="#" onClick={this.handleClick}>
+            {this.props.label}
+          </a>
+        </li>
       )
     }
   }
 }
-
-export default MenuEntry

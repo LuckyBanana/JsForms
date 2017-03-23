@@ -151,6 +151,11 @@ td img {
     }
 }
 
+.nav li.active a {
+  color: #fff;
+  background-color: #337ab7;
+}
+
 .btn-outline {
     color: inherit;
     background-color: transparent;

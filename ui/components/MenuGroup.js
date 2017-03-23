@@ -1,10 +1,16 @@
 import React from 'react'
 import MenuEntry from './MenuEntry'
 
-export class MenuGroup extends React.Component {
+export default class MenuGroup extends React.Component {
   constructor(props) {
     super(props)
-    this.state = {dislplayOptions: false}
+    this.state = {
+      group: {
+        items: [],
+        definition: {}
+      },
+      dislplayOptions: false
+    }
     this.showOptions = this.showOptions.bind(this)
   }
 
@@ -14,18 +20,21 @@ export class MenuGroup extends React.Component {
     })
   }
 
+  componentDidMount() {
+    // this.setState({ group: this.props.group })
+  }
+
   render() {
-    var self = this
-    var menuEntries = this.props.group.items.map(function (object) {
+    const menuEntries = this.props.group.items.map((object, index) => {
       return (
         <MenuEntry
           objectId={object.id}
-          active={object.id === self.props.activeObject ? 'active' : ''}
-          key={object.id + '_link'}
+          active={object.id === this.props.activeObject ? 'active' : ''}
+          key={object.id + '-link-' + index}
           label={object.label}
-          updateView={self.props.updateView}
+          updateView={this.props.updateView}
           insideGroup={true}
-      />
+        />
       )
     })
     var divClassName = this.state.dislplayOptions ? 'collapse in' : 'collapse'
@@ -33,16 +42,15 @@ export class MenuGroup extends React.Component {
       <li>
         <a data-toggle="collapse" onClick={this.showOptions}>
           {this.props.group.definition.name}
-          <span className="caret"></span>
+          <span className="caret pull-right"></span>
         </a>
         <div
           id={this.props.group.definition.name + 'Group'}
-          className={divClassName}>
-            {menuEntries}
+          className={divClassName}
+        >
+          {menuEntries}
         </div>
       </li>
     )
   }
 }
-
-export default MenuGroup

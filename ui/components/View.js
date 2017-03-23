@@ -64,7 +64,9 @@ export class View extends React.Component {
       <div className="col-lg-12 panel" >
         <div className="page-header" role="group">
           <div className="btn-group pull-right" role="group">
-            <Button bsStyle="success" onClick={this.displayCreationForm}>{ 'New ' + this.props.definition.label }</Button>
+            <Button bsStyle="success" onClick={this.displayCreationForm}>
+              { 'New ' + this.props.definition.label }
+            </Button>
           </div>
           <h1>{this.props.definition.label}</h1>
         </div>

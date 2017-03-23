@@ -4,9 +4,7 @@ import {
   FormGroup
 } from 'react-bootstrap'
 import Datetime from 'react-datetime'
-import {
-  ModalEditor
-} from './QuillEditor'
+import { ModalEditor } from './QuillEditor'
 import moment from 'moment'
 
 export class TextInputCell extends React.Component {

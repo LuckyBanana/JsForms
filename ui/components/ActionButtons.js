@@ -102,14 +102,30 @@ export class ActionButton extends React.Component {
   }
 
   render() {
-    var activateButton = this.props.activable ? <ActionButtonActivate id={this.props.id} key={this.props.alias + 'a' + this.props.id} apiUrl={this.props.apiUrl} handlers={this.props.handlers} valid={this.props.valid}/> : null
+    var activateButton = this.props.activable ?
+      <ActionButtonActivate
+        id={this.props.id}
+        key={this.props.alias + 'a' + this.props.id}
+        apiUrl={this.props.apiUrl}
+        handlers={this.props.handlers}
+        valid={this.props.valid}
+      /> :
+      null
     return (
       <td>
-        <div className="btn-group">
+        <div className="btn-group" style={{ margin: '0px' }}>
           <DropdownButton id={this.props.id} bsStyle='default' title='Action'>
-            <ActionButtonModify key={this.props.alias + 'm' + this.props.id} apiUrl={this.props.apiUrl} id={this.props.id} handlers={this.props.handlers} />
+            <ActionButtonModify
+                key={this.props.alias + 'm' + this.props.id}
+                apiUrl={this.props.apiUrl} id={this.props.id}
+                handlers={this.props.handlers}
+            />
             {activateButton}
-            <ActionButtonRemove key={this.props.alias + 'd' + this.props.id} apiUrl={this.props.apiUrl} id={this.props.id} handlers={this.props.handlers} />
+            <ActionButtonRemove
+              key={this.props.alias + 'd' + this.props.id}
+              apiUrl={this.props.apiUrl} id={this.props.id}
+              handlers={this.props.handlers}
+            />
           </DropdownButton>
         </div>
       </td>

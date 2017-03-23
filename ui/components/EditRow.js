@@ -74,22 +74,22 @@ export class EditRow extends React.Component {
         }
         var self = this
         fetch('/api/create' + this.props.apiUrl, req)
-          .then(function (res) {
+          .then(res => {
             return res.json()
           })
-          .then(function (data) {
+          .then(data => {
             if(data.msg === 'OK') {
               self.props.hideForm()
               self.props.refreshView()
             }
             else {
-              console.error(data);
               self.props.updateMessage('err', data.err.toString())
+              console.error(data)
             }
           })
-          .catch(function (err) {
-            console.error(err);
+          .catch(err => {
             self.props.updateMessage('err', err.toString())
+            console.error(err)
           })
       }
       else {
@@ -177,6 +177,9 @@ export class EditRow extends React.Component {
               data={baseValue}
             />
           )
+        }
+        else if (field.type === 'Boolean') {
+          
         }
         else {
           return (

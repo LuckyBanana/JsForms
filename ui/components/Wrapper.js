@@ -4,7 +4,7 @@ import Sidebar from './Sidebar'
 import View from './View'
 import { GET } from '../utils/api'
 
-export class Wrapper extends React.Component {
+export default class Wrapper extends React.Component {
   constructor(props) {
     super(props)
     this.updateView = this.updateView.bind(this)
@@ -13,6 +13,7 @@ export class Wrapper extends React.Component {
       menuData: [],
       objectIds: [],
       viewObjects: [],
+      groups: [],
       handlers: {
         updateView: this.updateView
       }
@@ -43,23 +44,45 @@ export class Wrapper extends React.Component {
       })
   }
 
+  getUsedGroups() {
+    // var req = {
+    //   method: 'GET',
+    //   mode: 'cors',
+    //   cache: 'default'
+    // }
+    // fetch('/api/maintenance/usedgroups', req)
+    //   .then((res) => res.json())
+    GET('/api/maintenance/usedgroups')
+      .then((data) => {
+        var groups = {}
+        for (const i in data) {
+          var gpData = data[i]
+          var gp = {
+            definition: gpData,
+            items: []
+          }
+          groups[gpData.id] = gp
+        }
+        this.setState({ groups: groups })
+      })
+  }
+
   updateView(id, refresh = false) {
     if (refresh) {
       //fetch new definition
     }
     else {
-      this.setState({
-        activeObject: id
-      })
+      this.setState({ activeObject: id })
     }
   }
 
   componentDidMount() {
     this.getViewObjects()
+    this.getUsedGroups()
   }
 
   render() {
-    var views = this.state.viewObjects.map((object) => {
+    const views = this.state.viewObjects.map((object) => {
       if (object.id === this.state.activeObject) {
         return (
           <View key={object.viewId} definition={object}/>
@@ -70,7 +93,12 @@ export class Wrapper extends React.Component {
       <div id="page">
         <nav className="navbar navbar-default navbar-static-top" role="navigation">
           <NavbarResp />
-          <Sidebar activeObject={this.state.activeObject} data={this.state.viewObjects} handlers={this.state.handlers} />
+          <Sidebar
+            groups={this.state.groups}
+            activeObject={this.state.activeObject}
+            data={this.state.viewObjects}
+            handlers={this.state.handlers}
+          />
         </nav>
         <div id="page-wrapper" className="container-fluid">
           <div id="main" className="row">
@@ -81,5 +109,3 @@ export class Wrapper extends React.Component {
     )
   }
 }
-
-export default Wrapper

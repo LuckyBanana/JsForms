@@ -40,12 +40,7 @@ export class TableRow extends React.Component {
   }
 
   render() {
-    var handlers = {
-      delete: this.deleteRow
-    }
-
-    const fieldContent = this.props.definition.map(function (field) {
-
+    const fieldContent = this.props.definition.map(field => {
       if (field.hidden)
         return null
 
@@ -57,9 +52,11 @@ export class TableRow extends React.Component {
             formattedDate = ''
           }
         }
-        catch(e) {console.log(e)}
+        catch(e) {console.error(e)}
         return (
-          <td key={this.props.identifier + field.name}>{formattedDate}</td>
+          <td key={this.props.identifier + field.name}>
+            {formattedDate}
+          </td>
         )
       }
       else if (field.type === 'Boolean') {
@@ -74,9 +71,7 @@ export class TableRow extends React.Component {
       }
       else if(field.type === 'Html') {
         return (
-          <td
-            key={this.props.identifier + field.name}
-          >
+          <td key={this.props.identifier + field.name}>
             <ModalEditor
               title={field.label}
               readOnly={true}
@@ -90,7 +85,8 @@ export class TableRow extends React.Component {
           <td key={this.props.identifier + field.name}>{this.props.data[field.name]}</td>
         )
       }
-    }.bind(this))
+    })
+
     if (!this.state.displayRow) {
       return null
     }
@@ -99,7 +95,14 @@ export class TableRow extends React.Component {
       return (
         <tr className={this.state.isRowValid ? 'active' : ''}>
           {fieldContent}
-          <ActionButton alias={this.props.data.alias} id={this.props.data.id} activable={this.props.activable} valid={this.state.isRowValid} apiUrl={this.props.apiUrl} handlers={this.state.handlers}/>
+          <ActionButton
+            alias={this.props.data.alias}
+            id={this.props.data.id}
+            activable={this.props.activable}
+            valid={this.state.isRowValid}
+            apiUrl={this.props.apiUrl}
+            handlers={this.state.handlers}
+          />
         </tr>
       )
     }

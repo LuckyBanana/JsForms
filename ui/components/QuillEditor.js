@@ -7,7 +7,8 @@ import {
   FormGroup,
   Glyphicon,
   InputGroup,
-  Modal } from 'react-bootstrap'
+  Modal
+} from 'react-bootstrap'
 
 export class ModalEditor extends React.Component {
   constructor(props, context) {
@@ -122,18 +123,13 @@ export class ModalEditor extends React.Component {
 
   render() {
     return (
-      <FormGroup>
-        {/* <InputGroup>
-          <InputGroup.Addon>
-            <Glyphicon onClick={this.showModal} glyph={this.state.readOnly ? 'eye-open' : 'pencil'} />
-          </InputGroup.Addon>
-          <FormControl type="text" onChange={this.handleChange} />
-        </InputGroup> */}
-        <ButtonToolbar>
-          <Button onClick={this.showModal} >
+      // <FormGroup>
+      //   <ButtonToolbar>
+      <div>
+          <Button onClick={this.showModal} style={{ margin: '0px' }}>
             <Glyphicon glyph={this.state.readOnly ? 'eye-open' : 'pencil'} />
           </Button>
-        </ButtonToolbar>
+        {/* </ButtonToolbar> */}
         <Modal
           {...this.props}
           show={this.state.showModal}
@@ -149,27 +145,28 @@ export class ModalEditor extends React.Component {
                   readOnly={this.state.readOnly}
                   modules={this.state.modules}
                   formats={this.state.formats}
-                  toolbar={false}
+                  // toolbar={false}
                   bounds={'._quill'}
                   value={this.state.value}
                   onChange={this.onEditorChange}
                   onChangeSelection={this.onEditorChangeSelection}
                 >
-                    <div
-                      key='editor'
-                      ref='editor'
-                      className='quill-contents border_solid_top'
-                      dangerouslySetInnerHTML={{__html: this.state.value}} />
-                  </ReactQuill>
-                </div>
+                  <div
+                    key='editor'
+                    ref='editor'
+                    className='quill-contents border_solid_top'
+                    dangerouslySetInnerHTML={{__html: this.state.value}}
+                  />
+                </ReactQuill>
+              </div>
             </Modal.Body>
             <Modal.Footer>
               <Button onClick={this.hideModal}>Close</Button>
               <Button bsStyle="primary" onClick={this.logValue}>Save changes</Button>
             </Modal.Footer>
         </Modal>
-      </FormGroup>
-
+      {/* </FormGroup> */}
+    </div>
     )
   }
 

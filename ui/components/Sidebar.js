@@ -13,13 +13,14 @@ export default class Sidebar extends React.Component {
   }
 
   render() {
-    const { groups } = this.props
-    const menuEntries = this.props.data.map(object => {
+    let { groups } = this.props
+    const menuEntries = this.props.data.map((object, index) => {
       if (object.groupId === '') {
         return (
           <MenuEntry
             objectId={object.id}
-            active={object.id === this.props.activeObject ? 'active' : ''} key={object.id + '-link'}
+            active={object.id === this.props.activeObject ? 'active' : ''}
+            key={object.id + '-link-' + index}
             label={object.label}
             updateView={this.props.handlers.updateView}
             insideGroup={false}
@@ -32,17 +33,17 @@ export default class Sidebar extends React.Component {
         }
       }
     })
+    console.log('pg', this.props.groups);
     // Transformation de l'objet "groups" en tableau puis tri par position
-    console.log('g', groups);
-    const groupEntries = Object
-      .keys(groups).map((i) => groups[i])
+    const groupEntries = Object.keys(groups)
+      .map(i => groups[i])
       .sort((a, b) => a.definition.pos - b.definition.pos)
-      .map((group) => {
+      .map(group => {
         return (
           <MenuGroup
             group={group}
             activeObject={this.props.activeObject}
-            key={group.definition.id + '_grouplink'}
+            key={group.definition.id + '-grouplink'}
             updateView={this.props.handlers.updateView}
           />
         )

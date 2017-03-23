@@ -2,8 +2,8 @@
 exports.openDb = (type, config) => {
 	const dblite = require('dblite')
 	db = dblite(':memory:', '-header')
-	db.query('attach database :db as :schema', {db: require('path').join('', '', 'db', config.get('Database.Connection.StorageDb')), schema: 'STORAGE'})
-	db.query('attach database :db as :schema', {db: require('path').join('', '', 'db', config.get('Database.Connection.ConfigDb')), schema: 'CONF'})
+	db.query('attach database :db as :schema', {db: require('path').join(__dirname, '..', '..', 'db', config.get('Database.Connection.StorageDb')), schema: 'STORAGE'})
+	db.query('attach database :db as :schema', {db: require('path').join(__dirname, '..', '..', 'db', config.get('Database.Connection.ConfigDb')), schema: 'CONF'})
 	return db
 }
 
@@ -685,7 +685,7 @@ exports.updateViewObjects = function (params, callback) {
 			throw 'Callback is not a function.';
 		}
 	}
-
+	db.query('.tables')
 	let query = SCHEMA_QUERY
 	query += params.id ? ' WHERE id = :id' : ''
 	query += params.defaultObject ? ' WHERE "default" = 1' : ''
@@ -714,7 +714,6 @@ exports.isValidRoute = (apiUrl, callback) => {
 /** AUTHENTICATION **/
 
 exports.authenticate = function (username, password, done) {
-	console.log(username, password);
 	const query = 'SELECT id_user as "id_user", login as "login", level as "level" FROM CONF.USER WHERE login = :user and password = :pass'
 	db.query(
 		query,

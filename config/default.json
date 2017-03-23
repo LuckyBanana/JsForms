@@ -2,8 +2,8 @@
 	"Database" : {
 		 "Client" : "sqlite",
 		 "Connection" : {
-			 "ConfigDb" : "conf_dev.db",
-			 "StorageDb" : "storage_dev.db"
+			 "ConfigDb" : "conf.db",
+			 "StorageDb" : "storage.db"
 		 }
 	},
 	"App" : {

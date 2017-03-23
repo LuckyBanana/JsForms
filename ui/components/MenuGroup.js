@@ -20,10 +20,6 @@ export default class MenuGroup extends React.Component {
     })
   }
 
-  componentDidMount() {
-    // this.setState({ group: this.props.group })
-  }
-
   render() {
     const menuEntries = this.props.group.items.map((object, index) => {
       return (

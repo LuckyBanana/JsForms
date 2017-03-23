@@ -8,6 +8,8 @@ export default class Wrapper extends React.Component {
   constructor(props) {
     super(props)
     this.updateView = this.updateView.bind(this)
+    this.getUsedGroups = this.getUsedGroups.bind(this)
+    this.updateView = this.updateView.bind(this)
     this.state = {
       activeObject: 0,
       menuData: [],
@@ -25,7 +27,7 @@ export default class Wrapper extends React.Component {
       .then((data) => {
         if(data.msg === 'OK') {
           let activeObject = null
-          data.obj.forEach((object) => {
+          data.obj.forEach(object => {
             if(object.default === true) {
               activeObject = object.id
             }
@@ -53,11 +55,11 @@ export default class Wrapper extends React.Component {
     // fetch('/api/maintenance/usedgroups', req)
     //   .then((res) => res.json())
     GET('/api/maintenance/usedgroups')
-      .then((data) => {
-        var groups = {}
-        for (const i in data) {
-          var gpData = data[i]
-          var gp = {
+      .then(data => {
+        const groups = {}
+        for (let i in data) {
+          const gpData = data[i]
+          const gp = {
             definition: gpData,
             items: []
           }
@@ -82,10 +84,10 @@ export default class Wrapper extends React.Component {
   }
 
   render() {
-    const views = this.state.viewObjects.map((object) => {
+    const views = this.state.viewObjects.map(object => {
       if (object.id === this.state.activeObject) {
         return (
-          <View key={object.viewId} definition={object}/>
+          <View key={object.viewId} definition={object} />
         )
       }
     })

@@ -72,7 +72,7 @@ export class View extends React.Component {
         </div>
         <div className="row">
           <MessagesPanel
-            key={this.props.definition.name + '_messages'}
+            key={this.props.definition.name + '-messages'}
             definition={this.state.message}
             dismiss={this.dismissMessage} />
         </div>
@@ -80,12 +80,12 @@ export class View extends React.Component {
           (
             <FormPanel
               definition={this.props.definition}
-              key={this.props.definition.name + '_table'}
+              key={this.props.definition.name + '-table'}
               handlers={{updateMessage: this.updateMessage}} />
           ) : (
             <TablePanel
               definition={this.props.definition}
-              key={this.props.definition.name + '_table'}
+              key={this.props.definition.name + '-table'}
               displayForm={this.state.creationForm.display}
               handlers={this.state.handlers}
            />)}

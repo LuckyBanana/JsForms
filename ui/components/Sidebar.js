@@ -13,7 +13,9 @@ export default class Sidebar extends React.Component {
   }
 
   render() {
-    let { groups } = this.props
+    const { groups } = this.props
+    Object.keys(groups).forEach(i => groups[i].items = [])
+
     const menuEntries = this.props.data.map((object, index) => {
       if (object.groupId === '') {
         return (
@@ -28,12 +30,11 @@ export default class Sidebar extends React.Component {
         )
       }
       else {
-        if (Object.keys(groups).length > 0) {
+        if (Object.keys(this.props.groups).length > 0) {
           groups[object.groupId].items.push(object)
         }
       }
     })
-    console.log('pg', this.props.groups);
     // Transformation de l'objet "groups" en tableau puis tri par position
     const groupEntries = Object.keys(groups)
       .map(i => groups[i])

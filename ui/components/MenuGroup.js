@@ -4,6 +4,7 @@ import MenuEntry from './MenuEntry'
 export default class MenuGroup extends React.Component {
   constructor(props) {
     super(props)
+    this.showOptions = this.showOptions.bind(this)
     this.state = {
       group: {
         items: [],
@@ -11,7 +12,6 @@ export default class MenuGroup extends React.Component {
       },
       dislplayOptions: false
     }
-    this.showOptions = this.showOptions.bind(this)
   }
 
   showOptions() {
@@ -21,7 +21,8 @@ export default class MenuGroup extends React.Component {
   }
 
   render() {
-    const menuEntries = this.props.group.items.map((object, index) => {
+    const { items } = this.props.group
+    const menuEntries = items.map((object, index) => {
       return (
         <MenuEntry
           objectId={object.id}

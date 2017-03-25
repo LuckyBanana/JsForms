@@ -8,18 +8,19 @@ import {
   FormBooleanInput
 } from './FormInputs'
 
-export class FormPanel extends React.Component {
+import { POST } from '../utils/api'
+
+export default class FormPanel extends React.Component {
   constructor(props) {
     super(props)
     this.submitForm = this.submitForm.bind(this)
     this.resetForm = this.resetForm.bind(this)
     this.handleInputChange = this.handleInputChange.bind(this)
-    var self = this
-    var initialState = this.props.definition.fields.map(function (field) {
+    const initialState = this.props.definition.fields.map(field => {
       if (field.name !== 'id' ) {
         var enrField = field
-        enrField.editValue = self.props.data !== undefined ? self.props.data[field.name] : null
-        enrField.inputId = self.props.objectId + '_' + field.id
+        enrField.editValue = this.props.data !== undefined ? this.props.data[field.name] : null
+        enrField.inputId = this.props.objectId + '-' + field.id
         enrField.errForm = false
         return enrField
       }
@@ -37,9 +38,7 @@ export class FormPanel extends React.Component {
         field.editValue = value
       }
     }
-    this.setState({
-      fields: fields
-    })
+    this.setState({ fields: fields })
   }
 
   submitForm() {
@@ -48,7 +47,7 @@ export class FormPanel extends React.Component {
     var formData = {}
     for (const field of fields) {
       if (field !== undefined) {
-        if (field.required !== 1 && field.editValue === null) {
+        if (!field.required && field.editValue === null) {
           field.errForm = true
           validateForm = false
         }
@@ -59,56 +58,36 @@ export class FormPanel extends React.Component {
       }
     }
     if (!validateForm) {
-      this.setState({
-        fields: fields
-      })
+      this.setState({ fields: fields })
     }
     else {
-      var req = {
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        },
-        method: 'POST',
-        mode: 'cors',
-        cache: 'default',
-        body: JSON.stringify(formData)
-      }
-      var self = this
-      fetch('/api/create' + this.props.apiUrl, req)
-        .then(function (res) {
-          return res.json()
-        })
-        .then(function (data) {
+      POST('/api/create' + this.props.apiUrl, formData)
+        .then(data => {
           if(data.msg === 'OK') {
-            self.props.hideForm()
-            self.props.refreshView()
+            this.props.hideForm()
+            this.props.refreshView()
           }
           else {
-            console.error(data);
-            self.props.updateMessage('err', data.err.toString())
+            this.props.updateMessage('err', data.err.toString())
+            console.error(data)
           }
         })
-        .catch(function (err) {
-          console.error(err);
-          self.props.updateMessage('err', err.toString())
+        .catch(err => {
+          this.props.updateMessage('err', err.toString())
+          console.error(err)
         })
     }
-  }
-
-  resetForm() {
-
   }
 
   render () {
-    var inputs = this.state.fields.map(function (field) {
+    const inputs = this.state.fields.map(field => {
       if(field.type === 'String') {
         return <FormTextInput key={this.props.definition.name + field.id} field={field} handleChange={this.handleInputChange}/>
       }
       if(field.type === 'Boolean') {
         return <FormBooleanInput key={this.props.definition.name + field.id} field={field} handleChange={this.handleInputChange} />
       }
-    }.bind(this))
+    })
     return (
       <div>
         {inputs}
@@ -120,5 +99,3 @@ export class FormPanel extends React.Component {
     )
   }
 }
-
-export default FormPanel

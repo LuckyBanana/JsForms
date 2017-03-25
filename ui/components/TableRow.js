@@ -1,19 +1,19 @@
 import React from 'react'
-import ActionButton from './ActionButtons'
 import FontAwesome from 'react-fontawesome'
-import { ModalEditor } from './QuillEditor'
+import ActionButton from './ActionButtons'
+import ModalEditor from './ModalEditor'
 
-export class TableRow extends React.Component {
+
+export default class TableRow extends React.Component {
   constructor(props) {
     super(props)
     this.deleteRow = this.deleteRow.bind(this)
     this.activateRow = this.activateRow.bind(this)
     this.displayEditionForm = this.displayEditionForm.bind(this)
-    var valid = this.props.activable && this.props.data.valid === '1';
     this.state =  {
       displayRow: true,
       modifyRow: false,
-      isRowValid: valid,
+      isRowValid: this.props.activable && this.props.data.valid === '1',
       handlers: {
         delete: this.deleteRow,
         modify: this.displayEditionForm,
@@ -28,15 +28,11 @@ export class TableRow extends React.Component {
   }
 
   activateRow() {
-    this.setState({
-      isRowValid: !this.state.isRowValid
-    })
+    this.setState({ isRowValid: !this.state.isRowValid })
   }
 
   deleteRow() {
-    this.setState({
-      displayRow: false
-    })
+    this.setState({ displayRow: false })
   }
 
   render() {
@@ -61,11 +57,20 @@ export class TableRow extends React.Component {
       }
       else if (field.type === 'Boolean') {
         return (
-          <td key={this.props.identifier + field.name}>
-            <FontAwesome
-              name={'toggle-' + (this.props.data[field.name] === true ? 'on' : 'off')}
-              size='2x'
-            />
+          <td
+            key={this.props.identifier + field.name}
+            style={{ textAlign: 'center', verticalAlign: 'middle' }}
+          >
+            <div className="togglebutton">
+              <label>
+                <input
+                  type="checkbox"
+                  disabled
+                  checked={this.props.data[field.name] === true}
+                />
+                <span className="toggle" />
+              </label>
+            </div>
           </td>
         )
       }
@@ -116,5 +121,3 @@ export class TableRow extends React.Component {
     }
   }
 }
-
-export default TableRow

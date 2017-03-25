@@ -15,9 +15,7 @@ export default class MenuGroup extends React.Component {
   }
 
   showOptions() {
-    this.setState({
-      dislplayOptions: !this.state.dislplayOptions
-    })
+    this.setState({ dislplayOptions: !this.state.dislplayOptions })
   }
 
   render() {
@@ -34,7 +32,6 @@ export default class MenuGroup extends React.Component {
         />
       )
     })
-    var divClassName = this.state.dislplayOptions ? 'collapse in' : 'collapse'
     return (
       <li>
         <a data-toggle="collapse" onClick={this.showOptions}>
@@ -43,7 +40,7 @@ export default class MenuGroup extends React.Component {
         </a>
         <div
           id={this.props.group.definition.name + 'Group'}
-          className={divClassName}
+          className={this.state.dislplayOptions ? 'collapse in' : 'collapse'}
         >
           {menuEntries}
         </div>

@@ -3,6 +3,7 @@ import {
   DropdownButton,
   MenuItem
 } from 'react-bootstrap'
+import { DELETE, POST } from '../utils/api'
 
 export class ActionButtonModify extends React.Component {
   constructor(props) {
@@ -29,26 +30,18 @@ export class ActionButtonActivate extends React.Component {
 
   activate() {
     const url = '/api/activate' + this.props.apiUrl + '/' + this.props.id
-    var req = {
-      method: 'POST',
-      mode: 'cors',
-      cache: 'default'
-    }
-    fetch(url, req)
-      .then(function (res) {
-        return res.json()
-      })
-      .then(function (data) {
+    POST(url)
+      .then(data => {
         if(data.msg === 'OK') {
           this.props.handlers.activate()
         }
         else {
           this.props.handler.updateMessage('alert', data.obj)
         }
-      }.bind(this))
-      .catch(function (err) {
+      })
+      .catch(err => {
         this.props.handlers.updateMessage('alert', err.toString())
-      }.bind(this))
+      })
   }
 
   render () {
@@ -65,17 +58,9 @@ export class ActionButtonRemove extends React.Component {
   }
 
   remove() {
-    var url = '/api' + this.props.apiUrl + '/' + this.props.id
-    var req = {
-      method: 'DELETE',
-      mode: 'cors',
-      cache: 'default'
-    }
-    fetch(url, req)
-      .then(function (res) {
-        return res.json()
-      })
-      .then(function (data) {
+    const url = '/api' + this.props.apiUrl + '/' + this.props.id
+    DELETE(url)
+      .then(data => {
         if(data.msg === 'OK') {
           this.props.handlers.delete()
           this.props.handlers.updateMessage('info', data.obj)
@@ -83,10 +68,10 @@ export class ActionButtonRemove extends React.Component {
         else {
           this.props.handlers.updateMessage('alert', data.obj)
         }
-      }.bind(this))
-      .catch(function (err) {
+      })
+      .catch(err => {
         this.props.handlers.updateMessage('alert', err)
-      }.bind(this))
+      })
   }
 
   render() {
@@ -96,16 +81,16 @@ export class ActionButtonRemove extends React.Component {
   }
 }
 
-export class ActionButton extends React.Component {
+export default class ActionButton extends React.Component {
   constructor(props) {
     super(props)
   }
 
   render() {
-    var activateButton = this.props.activable ?
+    const activateButton = this.props.activable ?
       <ActionButtonActivate
         id={this.props.id}
-        key={this.props.alias + 'a' + this.props.id}
+        key={this.props.alias + '-a-' + this.props.id}
         apiUrl={this.props.apiUrl}
         handlers={this.props.handlers}
         valid={this.props.valid}
@@ -116,14 +101,16 @@ export class ActionButton extends React.Component {
         <div className="btn-group" style={{ margin: '0px' }}>
           <DropdownButton id={this.props.id} bsStyle='default' title='Action'>
             <ActionButtonModify
-                key={this.props.alias + 'm' + this.props.id}
-                apiUrl={this.props.apiUrl} id={this.props.id}
+                key={this.props.alias + '-m-' + this.props.id}
+                apiUrl={this.props.apiUrl}
+                id={this.props.id}
                 handlers={this.props.handlers}
             />
             {activateButton}
             <ActionButtonRemove
-              key={this.props.alias + 'd' + this.props.id}
-              apiUrl={this.props.apiUrl} id={this.props.id}
+              key={this.props.alias + '-d-' + this.props.id}
+              apiUrl={this.props.apiUrl}
+              id={this.props.id}
               handlers={this.props.handlers}
             />
           </DropdownButton>
@@ -132,5 +119,3 @@ export class ActionButton extends React.Component {
     )
   }
 }
-
-export default ActionButton

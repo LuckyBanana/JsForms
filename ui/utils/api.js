@@ -11,11 +11,25 @@ const GET_REQ = () => {
   }
 }
 
-const POST_REQ = () => ({
-  method: 'GET',
-  mode: 'cors',
-  cache: 'defaut'
-})
+const POST_REQ = (formData, toJson) => {
+  const headers = toJson ?
+    {
+      'Accept': 'application/json',
+      'Content-Type': toJson ? 'application/json' : '',
+      // 'Authorization': 'Bearer ' + auth.getToken()
+    } :
+    {
+      'Accept': 'application/json',
+      // 'Authorization': 'Bearer ' + auth.getToken()
+    }
+  return {
+      headers: headers,
+      method: 'POST',
+      mode: 'cors',
+      cache: 'default',
+      body: toJson ? JSON.stringify(formData) : formData
+    }
+}
 
 const DELETE_REQ = () => ({
   method: 'DELETE',
@@ -26,7 +40,7 @@ const DELETE_REQ = () => ({
 module.exports = {
   GET(url) {
     return fetch(url, GET_REQ())
-      .then((res) => {
+      .then(res => {
         if(res.ok) {
           return res.json()
         }
@@ -35,9 +49,20 @@ module.exports = {
         }
       })
   },
-  POST(url) {
-    return fetch(url, POST_REQ())
-      .then((res) => {
+  POST(url, formData) {
+    return fetch(url, POST_REQ(formData, true))
+      .then(res => {
+        if(res.ok) {
+          return res.json()
+        }
+        else {
+          console.error(res.status)
+        }
+      })
+  },
+  DELETE(url) {
+    return fetch(url, DELETE_REQ())
+      .then(req => {
         if(res.ok) {
           return res.json()
         }

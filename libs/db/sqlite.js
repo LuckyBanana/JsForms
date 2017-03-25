@@ -49,7 +49,7 @@ exports.getAll = (...args) => {
 		END \
 		END AS 'field', \
 		CASE WHEN F.ISFOREIGN = 1 \
-		THEN 'LEFT JOIN ' || RO.SCHEMA || '.' || RO.NAME || ' ' || RO.ALIAS || F.ID_FIELD || ' ON ' || O.ALIAS || '.' || F.NAME || ' = ' || RO.ALIAS || F.ID_FIELD || '.ID' \
+		THEN 'LEFT JOIN ' || RO.SCHEMA || '.' || RO.NAME || ' ' || RO.ALIAS || F.ID_FIELD || ' ON ' || O.ALIAS || '.' || F.NAME || ' = ' || RO.ALIAS || F.ID_FIELD || '.ID' || CASE WHEN RO.SCHEMA = 'CONF' COLLATE NOCASE THEN '_' || RO.NAME ELSE '' END \
 		ELSE '' END AS 'join', \
 		F.NAME AS 'name', \
 		DT.NAME as 'type' \
@@ -70,7 +70,11 @@ exports.getAll = (...args) => {
 	let joinString = ''
 
 	db.query(query, {id_object: object.id}, (err, rows) => {
-		err && console.error(err)
+		if(err) {
+			console.error(err);
+			callback([])
+			return
+		}
 		for (row of rows) {
 			if(row.join != '') {
 				join = true
@@ -89,12 +93,20 @@ exports.getAll = (...args) => {
 			joinString += row.join != '' ? '' + row.join + ' ' : ''
 		}
 		fieldString = __removeLastChar(fieldString)
-		query = 'SELECT ' + fieldString + ' FROM ' + object.schema +  '.' + object.name + (joinString != '' ? ' ' + object.alias  + ' ' : '') + joinString
-		query += (params.id && !(params.id instanceof Function) ? ' WHERE ' + (join ? ' ' + object.alias + '.' : '') + 'ID = ' + params.id : '')
+
+		query = 'SELECT ' + fieldString + ' FROM ' + object.schema +  '.' + object.name + ' ' + object.alias  + ' ' + joinString
+		query += object.schema.toUpperCase() === 'CONF' ? ' WHERE ' + object.alias + '.ID_' + object.name + ' > 100' : ''
+		query += (params.id && !(params.id instanceof Function)) ?
+			(object.schema === 'CONF' ? ' AND ' : ' WHERE ') + ' ' + object.alias + '.ID = ' + params.id :
+			''
 		query += (params.page && !(params.page instanceof Function) ? ' LIMIT ' + params.page*20 + ' OFFSET ' + (params.page-1)*20 + ';': ';')
 
 		db.query(query, dataMap, (err, rows) => {
-			err && console.log(err)
+			if(err) {
+				console.error(err);
+				callback([])
+				return
+			}
 			typeof callback === 'function' && callback(rows)
 		})
 	})
@@ -108,21 +120,21 @@ exports.getCount = (object, callback) => {
 }
 
 exports.getGroups = (callback) => {
-	const query = 'SELECT ID_GROUP AS id, NAME AS name FROM CONF.OBJECTGROUP WHERE VALID = 1 ORDER BY POS ASC;'
+	const query = 'SELECT ID_OBJECTGROUP AS id, NAME AS name FROM CONF.OBJECTGROUP WHERE VALID = 1 ORDER BY POS ASC;'
 	db.query(query, (rows) => {
 		typeof callback === 'function' && callback(rows)
 	})
 }
 
 exports.getUsedGroups = (prod, callback) => {
-	const query = 'SELECT DISTINCT CG.ID_GROUP id, CG.NAME name, CG.POS pos, CG.VALID valid FROM CONF.OBJECT CO INNER JOIN CONF.OBJECTGROUP CG ON CG.ID_GROUP = CO.PARENT_GROUP WHERE VALID = 1 ' + (prod ? 'AND ID_GROUP >= 100' : '') + ' ORDER BY CG.POS ASC'
-	db.query(query, {id: Number, name: String, pos: Number, valid: Boolean}, (rows) => {
+	const query = 'SELECT DISTINCT CG.ID_OBJECTGROUP id, CG.NAME name, CG.POS pos, CG.VALID valid FROM CONF.OBJECT CO INNER JOIN CONF.OBJECTGROUP CG ON CG.ID_OBJECTGROUP = CO.PARENT_GROUP WHERE VALID = 1 ' + (prod ? 'AND ID_OBJECTGROUP >= 100' : '') + ' ORDER BY CG.POS ASC'
+	db.query(query, { id: Number, name: String, pos: Number, valid: Boolean }, (rows) => {
 		typeof callback === 'function' && callback(rows)
 	})
 }
 
 exports.getGroupObjects = (prod, callback) => {
-	const query = 'SELECT CG.ID_GROUP AS groupId, CG.NAME groupName, CG.POS AS groupPos, CO.ID_OBJECT objectId, CO.NAME objectName, CO.LABEL AS objectLabel, CO.POS AS objectPos FROM CONF.OBJECT CO JOIN CONF.OBJECTGROUP CG ON CO.PARENT_GROUP = CG.ID_GROUP ORDER BY CG.POS ASC;'
+	const query = 'SELECT CG.ID_OBJECTGROUP AS groupId, CG.NAME groupName, CG.POS AS groupPos, CO.ID_OBJECT objectId, CO.NAME objectName, CO.LABEL AS objectLabel, CO.POS AS objectPos FROM CONF.OBJECT CO JOIN CONF.OBJECTGROUP CG ON CO.PARENT_GROUP = CG.ID_OBJECTGROUP ORDER BY CG.POS ASC;'
 	db.query(query, (rows) => {
 		typeof callback === 'function' && callback(rows)
 	})
@@ -302,7 +314,7 @@ exports.addColumn = (data, callback) => {
 			}
 		}
 		if (!unique) {
-			typeof callback === 'function' && callback({msg: 'KO', err : result})
+			typeof callback === 'function' && callback({ msg: 'KO', err : result })
 		}
 		else {
 			db.query('BEGIN TRANSACTION;');
@@ -336,7 +348,7 @@ exports.addColumn = (data, callback) => {
 				newId = rows[0]['ID_FIELD']
 				if (!newId) {
 					db.query('ROLLBACK;');
-					typeof callback === 'function' && callback({msg: 'KO'})
+					typeof callback === 'function' && callback({ msg: 'KO' })
 					return;
 				}
 				query = 'SELECT "ALTER TABLE STORAGE.' + data.objectName + ' ADD COLUMN " || name || CASE WHEN ISFOREIGN THEN " INTEGER" '
@@ -348,7 +360,7 @@ exports.addColumn = (data, callback) => {
 					query = rows[0].query
 					db.query(query, (err, rows) => {
 						db.query('COMMIT;')
-						typeof callback === 'function' && callback({msg: 'OK'})
+						typeof callback === 'function' && callback({ msg: 'OK' })
 					});
 				});
 			});
@@ -370,18 +382,18 @@ exports.removeView = (name, callback) => {
 			db.query(query, {name: name}, (err, rows) => {
 				if(!err) {
 					db.query('COMMIT;')
-					typeof callback === 'function' && callback({msg: 'OK'})
+					typeof callback === 'function' && callback({ msg: 'OK' })
 				}
 				else {
 					db.query('ROLLBACK;')
-					typeof callback === 'function' && callback({msg: 'KO', detail: err})
+					typeof callback === 'function' && callback({ msg: 'KO', detail: err })
 				}
 			})
 		}
 		else {
 			console.error(err)
 			db.query('ROLLBACK')
-			typeof callback === 'function' && callback({msg: 'KO', detail: err})
+			typeof callback === 'function' && callback({ msg: 'KO', detail: err })
 		}
 	});
 }
@@ -391,7 +403,7 @@ exports.setDefault = (name, callback) => {
 	db.query(query, (err, rows) => {
 		query = 'UPDATE CONF.OBJECT SET ISDEFAULT = 1 WHERE NAME = :name;'
 		db.query(query, {name: name}, (err, rows) => {
-			typeof callback === 'function' && callback({msg: 'OK'})
+			typeof callback === 'function' && callback({ msg: 'OK' })
 		});
 	});
 }
@@ -418,9 +430,8 @@ exports.editField = (object, field, data, callback) => {
 	db.query(query, params, (err, rows) => {
 			if (err || rows.length != 1) {
 				//faire un truc
-				console.log(err)
 				db.query('ROLLBACK')
-				typeof callback === 'function' && callback({msg: 'KO', detail: err})
+				typeof callback === 'function' && callback({ msg: 'KO', detail: err })
 				return;
 			}
 			else {
@@ -438,7 +449,7 @@ exports.editField = (object, field, data, callback) => {
 				}
 				db.query('COMMIT;');
 				updateViewObjects(() => {
-					typeof callback === 'function' && callback({msg: 'OK'});
+					typeof callback === 'function' && callback({ msg: 'OK' });
 				});
 			}
 		});
@@ -484,7 +495,7 @@ exports.removeField = (object, field, callback) => {
 
 	db.query(query, {object: object, field: field}, (err, rows) => {
 		if (err || rows.length != 1) {
-			console.log(err);
+			console.error(err);
 			db.query('ROLLBACK');
 			typeof callback === 'function' && callback({msg: 'KO', detail: err});
 			return;
@@ -495,7 +506,7 @@ exports.removeField = (object, field, callback) => {
 			db.query(query, {id_field: idField});
 			db.query('SELECT * FROM CONF.FIELD WHERE ID_FIELD = :id_field', {id_field: idField}, function (err, rows) {
 				if(rows.length != 0) {
-					console.log(err);
+					console.error(err);
 					db.query('ROLLBACK');
 					typeof callback === 'function' && callback({msg: 'KO', detail: err});
 					return;
@@ -511,7 +522,7 @@ exports.removeField = (object, field, callback) => {
 
 					db.query(query, {object: object}, function (err, rows) {
 						if (err) {
-							console.log(err);
+							console.error(err);
 							db.query('ROLLBACK');
 							return;
 						}
@@ -527,15 +538,15 @@ exports.removeField = (object, field, callback) => {
 						query += 'INSERT INTO STORAGE.' + object + ' SELECT ' + nameString + ' FROM STORAGE.' + object + '_old;';
 						db.query(query, function (err, rows) {
 							if(err) {
-								console.log(err);
+								console.error(err);
 								db.query('ROLLBACK');
-								typeof callback === 'function' && callback({msg: 'KO', detail: err});
+								typeof callback === 'function' && callback({ msg: 'KO', detail: err });
 								return;
 							}
 							else {
 								db.query('DROP TABLE ' + object + '_old;');
 								db.query('COMMIT');
-								typeof callback === 'function' && callback({msg: 'OK'});
+								typeof callback === 'function' && callback({ msg: 'OK' });
 							}
 						});
 					});
@@ -558,11 +569,11 @@ exports.editObjectOrder = (data, callback) => {
 
 	for (object in data) {
 		query = 'UPDATE OBJECT SET POS = :pos WHERE NAME = :name;'
-		db.query(query, {name: object, pos: data[object]})
+		db.query(query, { name: object, pos: data[object] })
 	}
 
 	db.query('COMMIT;', (err, rows) => {
-		err ? callback({msg: 'KO', detail: err}) : callback({msg: 'OK'})
+		err ? callback({ msg: 'KO', detail: err }) : callback({ msg: 'OK' })
 	})
 }
 
@@ -577,37 +588,37 @@ exports.getAllUsers = (callback) => {
 
 exports.createUser = (data, callback) => {
 	const query = 'INSERT OR ROLLBACK INTO CONF.USER VALUES (NULL, :login, :password, :level, 1);'
-	db.query('SELECT COALESCE(MAX(LOGIN = :login), 0) AS "exists" FROM CONF.USER;', {login: data.userLoginInput}, (err, rows) => {
+	db.query('SELECT COALESCE(MAX(LOGIN = :login), 0) AS "exists" FROM CONF.USER;', { login: data.userLoginInput }, (err, rows) => {
 		console.error(err);
 		if (rows[0].exists === 0) {
-			db.query(query, {login: data.userLoginInput, password: data.userPasswordInput, level: data.userLevelInput}, (err, rows) => {
-				err ? callback({msg: 'KO', detail: err}) : callback({msg: 'OK'})
+			db.query(query, { login: data.userLoginInput, password: data.userPasswordInput, level: data.userLevelInput }, (err, rows) => {
+				err ? callback({ msg: 'KO', detail: err }) : callback({ msg: 'OK' })
 			})
 		}
 		else {
-			typeof callback === 'function' && callback({msg: 'KO', detail: {unique: 0}})
+			typeof callback === 'function' && callback({ msg: 'KO', detail: {unique: 0 }})
 		}
 	})
 }
 
 exports.modifyUser = (id, data, callback) => {
 	var query = 'UPDATE CONF.USER SET LEVEL = :level WHERE ID_USER = :id;'
-	db.query(query, {id: id, level: data.userLevelModify}, (err, rows) => {
-		err ? callback({msg: 'KO', detail: err}) : callback({msg: 'OK'})
+	db.query(query, { id: id, level: data.userLevelModify }, (err, rows) => {
+		err ? callback({ msg: 'KO', detail: err }) : callback({ msg: 'OK' })
 	})
 }
 
 exports.deleteUser = (id, callback) => {
 	var query = 'DELETE FROM CONF.USER WHERE ID_USER = :id;'
-	db.query(query, {id: id}, (err, rows) => {
-		err ? callback({msg: 'KO', detail: err}) : callback({msg: 'OK'})
+	db.query(query, { id: id }, (err, rows) => {
+		err ? callback({ msg: 'KO', detail: err }) : callback({ msg: 'OK' })
 	})
 }
 
 exports.activateUser = (id, callback) => {
 	var query = 'UPDATE CONF.USER SET ACTIVE = CASE WHEN ACTIVE = 0 THEN 1 ELSE 0 END WHERE ID_USER = :id';
-	db.query(query, {id: id}, function (err, rows) {
-		err ? callback({msg: 'KO', detail: err}) : callback({msg: 'OK'});
+	db.query(query, { id: id }, function (err, rows) {
+		err ? callback({msg: 'KO', detail: err}) : callback({ msg: 'OK' });
 	});
 }
 
@@ -624,14 +635,14 @@ const SCHEMA_QUERY = "SELECT O.ID_OBJECT id, \
 				 O.ISACTIVABLE activable, \
 				 O.POS pos, \
 				 G.NAME \"group\", \
-				 G.ID_GROUP groupId, \
+				 G.ID_OBJECTGROUP groupId, \
 				 O.CUSTOM custom, \
 				 O.ISFORM \"isform\", \
 				 COALESCE(F.FIELDS, JSON_ARRAY() ) fields \
 FROM OBJECT O \
 LEFT JOIN ( \
 		SELECT PARENT_OBJECT, \
-						 JSON_GROUP_ARRAY(JSON_OBJECT('id', ID_FIELD, 'name', NAME, 'label', LABEL, 'type', DATATYPE, \ 'generated', ISGENERATED, 'default', DATADEFAULT, 'foreign', ISFOREIGN, 'referencedObject', REFERENCED_OBJECT,                 'referencedField', REFERENCED_FIELD, 'pos', POS, 'parentObject', PARENT_OBJECT, 'hidden', HIDDEN, 'required', REQUIRED) ) FIELDS \
+						 JSON_GROUP_ARRAY(JSON_OBJECT('id', ID_FIELD, 'name', NAME, 'label', LABEL, 'type', DATATYPE, \ 'generated', ISGENERATED, 'default', DATADEFAULT, 'foreign', ISFOREIGN, 'referencedObject', REFERENCED_OBJECT, 'referencedField', REFERENCED_FIELD, 'pos', POS, 'parentObject', PARENT_OBJECT, 'hidden', HIDDEN, 'required', REQUIRED) ) FIELDS \
 				FROM ( \
 						SELECT F.PARENT_OBJECT, \
 						 F.ID_FIELD, \
@@ -655,7 +666,7 @@ LEFT JOIN ( \
 		 ) FIELDS \
 			 GROUP BY PARENT_OBJECT \
 ) F ON O.ID_OBJECT = F.PARENT_OBJECT \
-LEFT JOIN OBJECTGROUP G ON O.PARENT_GROUP = G.ID_GROUP"
+LEFT JOIN OBJECTGROUP G ON O.PARENT_GROUP = G.ID_OBJECTGROUP"
 
 const SCHEMA_TYPES = {
 	id: Number,
@@ -670,9 +681,18 @@ const SCHEMA_TYPES = {
 	pos: Number,
 	group: String,
 	groupId: String,
-	custom: Number,
-	isform: Number,
-	fields: JSON.parse
+	custom: Boolean,
+	isform: Boolean,
+	fields: (fieldValue) => {
+		return JSON.parse(fieldValue, (key, value) => {
+			if(['generated', 'foreign', 'hidden', 'required'].indexOf(key) !== -1) {
+				return Boolean(value)
+			}
+			else {
+				return value
+			}
+		})
+	}
 }
 
 exports.updateViewObjects = function (params, callback) {
@@ -685,28 +705,22 @@ exports.updateViewObjects = function (params, callback) {
 			throw 'Callback is not a function.';
 		}
 	}
-	db.query('.tables')
+
 	let query = SCHEMA_QUERY
 	query += params.id ? ' WHERE id = :id' : ''
 	query += params.defaultObject ? ' WHERE "default" = 1' : ''
 	query += params.prod ? ' WHERE ID_OBJECT >= 100' : ''
 	query += ' ORDER BY O.POS;'
 
-	db.query(query,
-		params,
-		SCHEMA_TYPES,
-		(err, rows) => {
-			err && console.log(err)
+	db.query(query,	params,	SCHEMA_TYPES,	(err, rows) => {
+			err && console.error(err)
 			typeof callback === 'function' && callback({msg: 'OK', obj: rows})
 	})
 }
 
 exports.isValidRoute = (apiUrl, callback) => {
 	const query = SCHEMA_QUERY + ' WHERE apiUrl = :apiUrl'
-	db.query(query,
-		{apiUrl: '/' + apiUrl},
-		SCHEMA_TYPES,
-		(err, rows) => {
+	db.query(query, {apiUrl: '/' + apiUrl},	SCHEMA_TYPES,	(err, rows) => {
 			typeof callback === 'function' && callback(rows[0]);
 	})
 }
@@ -715,11 +729,7 @@ exports.isValidRoute = (apiUrl, callback) => {
 
 exports.authenticate = function (username, password, done) {
 	const query = 'SELECT id_user as "id_user", login as "login", level as "level" FROM CONF.USER WHERE login = :user and password = :pass'
-	db.query(
-		query,
-		// {id_user: Number, login: String, level: Number},
-		{user: username, pass: password},
-		(err, rows) => {
+	db.query(query,	{ user: username, pass: password }, (err, rows) => {
 			if(rows.length === 0) {
 				return done(null, false, {message: 'Cannot authenticate user.'})
 			}

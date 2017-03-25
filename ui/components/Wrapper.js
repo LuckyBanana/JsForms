@@ -47,13 +47,6 @@ export default class Wrapper extends React.Component {
   }
 
   getUsedGroups() {
-    // var req = {
-    //   method: 'GET',
-    //   mode: 'cors',
-    //   cache: 'default'
-    // }
-    // fetch('/api/maintenance/usedgroups', req)
-    //   .then((res) => res.json())
     GET('/api/maintenance/usedgroups')
       .then(data => {
         const groups = {}

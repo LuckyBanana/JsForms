@@ -13,7 +13,7 @@ export default class MenuEntry extends React.Component {
   render() {
     if (this.props.insideGroup) {
       return (
-        <a className="list-group-item" onClick={this.handleClick}>
+        <a className={'list-group-item ' + this.props.active} onClick={this.handleClick}>
           {this.props.label}
         </a>
       )

@@ -2,9 +2,12 @@ import React from 'react'
 import EditRow from './EditRow'
 import TableRow from './TableRow'
 
-export class TablePanel extends React.Component {
+import { GET } from '../utils/api'
+
+export default class TablePanel extends React.Component {
   constructor(props) {
     super(props)
+    this.getData = this.getData.bind(this)
     this.refreshView = this.refreshView.bind(this)
     this.displayEditionForm = this.displayEditionForm.bind(this)
     this.dismissEditionForm = this.dismissEditionForm.bind(this)
@@ -18,28 +21,19 @@ export class TablePanel extends React.Component {
   }
 
   getData(page) {
-    var self = this;
-    var req = {
-      method: 'GET',
-      mode: 'cors',
-      cache: 'default'
-    }
-    fetch('api/limit' + this.props.definition.apiUrl + '/' + page, req)
-      .then(function (res) {
-        return res.json()
-      })
-      .then(function (json) {
-        var data = json.map(function (obj) {
+    GET('/api/limit' + this.props.definition.apiUrl + '/' + page)
+      .then(json => {
+        var data = json.map(obj => {
           obj.editMode = false
           return obj
         })
         this.setState({
           data: data
         })
-      }.bind(this))
-      .catch(function (err) {
-        console.error(err);
       })
+      // .catch(err => {
+      //   console.error(err)
+      // })
   }
 
   refreshView() {
@@ -54,9 +48,7 @@ export class TablePanel extends React.Component {
         // break
       }
     }
-    this.setState({
-      data: dataCopy
-    })
+    this.setState({ data: dataCopy })
   }
 
   dismissEditionForm(rowId) {
@@ -67,9 +59,7 @@ export class TablePanel extends React.Component {
         // break
       }
     }
-    this.setState({
-      data: dataCopy
-    })
+    this.setState({ data: dataCopy })
   }
 
   displayCreationForm() {
@@ -85,40 +75,37 @@ export class TablePanel extends React.Component {
       displayEditionForm: this.displayEditionForm
     }
     Object.assign(handlers, this.props.handlers)
-    this.setState({
-      handlers: handlers
-    })
+    this.setState({ handlers: handlers })
     this.refreshView()
   }
 
   render() {
-    const tableHeader = this.props.definition.fields.map(function (col) {
-      return col.hidden !== 1 && <th key={this.props.definition.alias + 'def' + col.name}>{col.label}</th>
-    }.bind(this))
+    const tableHeader = this.props.definition.fields.map((col, index) => {
+      return !col.hidden && <th key={this.props.definition.alias + '-def-' + index}>{col.label}</th>
+    })
     const tableBody = this.state.data.map((obj, index) => {
       if(obj.editMode) {
         return <EditRow
-            mode='edit'
-            hideForm={this.dismissEditingForm}
-            objectId={this.props.definition.id}
             apiUrl={this.props.definition.apiUrl}
-            key={this.props.definition.id + '_cf'}
-            definition={this.props.definition.fields}
             data={obj}
-            updateMessage={this.props.handlers.updateMessage}
-            refreshView={this.refreshView}
+            definition={this.props.definition.fields}
             hideForm={this.dismissEditionForm}
+            key={this.props.definition.id + '-er-' + index}
+            mode='edit'
+            objectId={this.props.definition.id}
+            refreshView={this.refreshView}
+            updateMessage={this.props.handlers.updateMessage}
           />
       }
       else {
         return <TableRow
-            key={this.props.definition.name + '-' + index}
-            identifier={this.props.definition.name + '-' + index}
-            data={obj}
             activable={this.props.definition.activable}
             apiUrl={this.props.definition.apiUrl}
-            handlers={this.state.handlers}
+            data={obj}
             definition={this.props.definition.fields}
+            key={this.props.definition.name + '-tr-' + index}
+            identifier={this.props.definition.name + '-' + index}
+            handlers={this.state.handlers}
           />
       }
     })
@@ -134,14 +121,14 @@ export class TablePanel extends React.Component {
           <tbody>
             {this.props.displayForm ?
               <EditRow
-                mode='new'
-                hideForm={this.props.handlers.hideCreationForm}
-                objectId={this.props.definition.id}
                 apiUrl={this.props.definition.apiUrl}
-                key={this.props.definition.id + '_cf'}
                 definition={this.props.definition.fields}
-                updateMessage={this.props.handlers.updateMessage}
+                hideForm={this.props.handlers.hideCreationForm}
+                key={this.props.definition.id + '-cf'}
+                mode='new'
+                objectId={this.props.definition.id}
                 refreshView={this.refreshView}
+                updateMessage={this.props.handlers.updateMessage}
               /> :
               null}
             {tableBody}
@@ -151,5 +138,3 @@ export class TablePanel extends React.Component {
     )
   }
 }
-
-export default TablePanel

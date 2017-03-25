@@ -4,36 +4,34 @@ import {
   FormGroup
 } from 'react-bootstrap'
 import Datetime from 'react-datetime'
-import { ModalEditor } from './QuillEditor'
 import moment from 'moment'
+
+import ModalEditor from './ModalEditor'
+import { GET } from '../utils/api'
 
 export class TextInputCell extends React.Component {
   constructor(props) {
     super(props)
     this.handleChange = this.handleChange.bind(this)
-    this.state = {
-      value: null
-    }
+    this.state = { value: null }
   }
 
   handleChange(event) {
-    this.setState({
-      value: event.target.value
-    })
+    this.setState({ value: event.target.value })
     this.props.handleChange(this.props.field.id, event.target.value)
   }
 
   componentDidMount() {
-    this.setState({
-      value: this.props.data
-    })
+    this.setState({ value: this.props.data })
   }
 
   render() {
-    var validationState = this.props.field.errForm ? 'error' : null
     return (
       <td>
-        <FormGroup validationState={validationState} >
+        <FormGroup
+          validationState={this.props.field.errForm ? 'error' : null}
+          style={{ margin: '0px' }}
+        >
           <FormControl type="text" onChange={this.handleChange} value={this.state.value} />
           {this.props.field.errForm ? <FormControl.Feedback /> : null}
         </FormGroup>
@@ -76,32 +74,63 @@ export class DateInputCell extends React.Component {
   }
 
   handleChange(date) {
-    this.setState({
-      value: date
-    })
+    this.setState({ value: date })
     var newDate = date !== undefined ? date.format('YYYY-MM-DD HH:mm') : null
     this.props.handleChange(this.props.field.id, newDate)
   }
 
   componentDidMount() {
-    // const date = this.props.data !== undefined ? this.props.data.format('YYYY-MM-DD HH:mm') : null
-    this.setState({
-      value: moment(this.props.data, 'YYYY/MM/DD HH:mm')
-    })
+    this.setState({ value: moment(this.props.data, 'YYYY/MM/DD HH:mm') })
     this.props.handleChange(this.props.field.id, moment(this.props.data, 'YYYY/MM/DD HH:mm'))
   }
 
   render() {
-    var validationState = this.props.field.errForm ? 'error' : null
     return (
       <td>
-        <FormGroup validationState={validationState} >
+        <FormGroup
+          validationState={this.props.field.errForm ? 'error' : null}
+          style={{ margin: '0px' }}
+        >
           <Datetime
             onChange={this.handleChange}
             locale='fr'
             value={this.state.value} />
           {this.props.field.errForm ? <FormControl.Feedback /> : null}
         </FormGroup>
+      </td>
+    )
+  }
+}
+
+export class BooleanInputCell extends React.Component {
+  constructor(props) {
+    super(props)
+    this.handleChange = this.handleChange.bind(this)
+    this.state = { value: false }
+  }
+
+  handleChange() {
+    this.setState({ value: !this.state.value })
+    this.props.handleChange(this.props.field.id, !this.state.value)
+  }
+
+  componentWillMount() {
+    this.setState({ value: this.props.data })
+  }
+
+  render() {
+    return (
+      <td style={{ textAlign: 'center', verticalAlign: 'middle' }}>
+        <div className="togglebutton">
+          <label>
+            <input
+              type="checkbox"
+              checked={this.state.value}
+              onChange={this.handleChange}
+            />
+            <span className="toggle" />
+          </label>
+        </div>
       </td>
     )
   }
@@ -122,7 +151,9 @@ export class FileInputCell extends React.Component {
 export class DropdownInputCell extends React.Component {
   constructor(props) {
     super(props)
+    this.getReferencedObjectDefinition = this.getReferencedObjectDefinition.bind(this)
     this.handleChange = this.handleChange.bind(this)
+    this.getOptions = this.getOptions.bind(this)
     this.state = {
       cols: [],
       referencedObjectApiUrl: null,
@@ -131,22 +162,13 @@ export class DropdownInputCell extends React.Component {
   }
 
   getReferencedObjectDefinition() {
-    var self = this;
-    var req = {
-      method: 'GET',
-      mode: 'cors',
-      cache: 'default'
-    }
-    fetch('/api/init/view/' + this.props.field.referencedObject)
-      .then(function (res) {
-        return res.json()
-      })
-      .then(function (data) {
+    GET('/api/init/view/' + this.props.field.referencedObject)
+      .then(data => {
         if(data.msg === 'OK') {
-          var referencedField;
-          Object.keys(data.obj[0].fields).forEach(function (key) {
-            var field = data.obj[0].fields[key];
-            if(self.props.field.referencedField === field.id) {
+          let referencedField = {}
+          Object.keys(data.obj[0].fields).forEach(key => {
+            const field = data.obj[0].fields[key]
+            if(this.props.field.referencedField === field.id) {
               referencedField = field
             }
           })
@@ -159,41 +181,32 @@ export class DropdownInputCell extends React.Component {
           console.error(data.obj)
         }
       })
-      .then(function (data) {
-        self.getOptions(data.referencedObjectApiUrl, data.referencedField)
+      .then(data => {
+        this.getOptions(data.referencedObjectApiUrl, data.referencedField)
       })
-      .catch(function (err) {
+      .catch(err => {
         console.error(err)
       })
   }
 
   getOptions(referencedObjectApiUrl, referencedField) {
-    var self = this;
-    var req = {
-      method: 'GET',
-      mode: 'cors',
-      cache: 'default'
-    }
-    fetch('/api/get' + referencedObjectApiUrl, req)
-      .then(function (res) {
-        return res.json()
-      })
-      .then(function (data) {
+    GET('/api/get' + referencedObjectApiUrl)
+      .then(data => {
         this.props.handleChange(this.props.field.id, data[0].id)
-        var cols = data.map(function (col) {
-          return ({
-            selected: self.props.selected === col.id,
+        const cols = data.map(col =>
+          ({
+            selected: this.props.selected === col.id,
             value: col[referencedField.name],
             colId: col.id
           })
-        })
+        )
         this.setState({
           cols: cols,
           referencedObjectApiUrl: referencedObjectApiUrl,
           referencedField: referencedField
         })
-      }.bind(this))
-      .catch(function (err) {
+      })
+      .catch(err => {
         console.error(err)
       })
   }
@@ -207,15 +220,16 @@ export class DropdownInputCell extends React.Component {
   }
 
   render() {
-    var self = this;
-    var row = this.state.cols.map(function (col) {
+    const row = this.state.cols.map(col => {
       return <option
         value={col.colId}
-        key={'option' + col.colId + '_' + self.state.referencedField.id}
-        id={'option' + col.colId + '_' + self.state.referencedField.id}
+        key={'option' + col.colId + '_' + this.state.referencedField.id}
+        id={'option' + col.colId + '_' + this.state.referencedField.id}
         selected={this.props.data === col.value ? true : false}
-      >{col.value}</option>
-    }.bind(this))
+      >
+        {col.value}
+      </option>
+    })
     return (
       <td>
         <FormControl onChange={this.handleChange} componentClass="select">

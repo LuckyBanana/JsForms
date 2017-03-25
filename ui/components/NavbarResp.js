@@ -3,54 +3,40 @@ import {
   Nav,
   Navbar,
   NavItem
-  } from 'react-bootstrap'
+} from 'react-bootstrap'
 
-export class NavbarResp extends React.Component {
+import { GET } from '../utils/api'
+
+export default class NavbarResp extends React.Component {
   constructor(props) {
     super(props)
+    this.getName = this.getName.bind(this)
     this.state = {
       appName: ''
     }
   }
 
   getName () {
-    var req = {
-      method: 'GET',
-      mode: 'cors',
-      cache: 'default'
-    }
-    fetch('/api/maintenance/appname', req)
-      .then(function (res) {
-        return res.json()
-      })
-      .then(function (data) {
+    GET('/api/maintenance/appName')
+      .then(data => {
         if (data.msg === 'OK') {
           this.setState({appName: data.obj})
         }
         else {
           console.error(data.obj)
         }
-      }.bind(this))
+      })
   }
 
   logout() {
-    var req = {
-      method: 'GET',
-      mode: 'cors',
-      cache: 'default'
-    }
-    fetch('/logout', req)
-      .then(function () {
-        console.error('Logging out...')
+    GET('/logout')
+      .then(_ => {
         location.reload()
+        console.error('Logging out...')
       })
-      .catch(function (err) {
+      .catch(err => {
         console.error(err)
       })
-  }
-
-  refreshView() {
-
   }
 
   componentDidMount() {
@@ -81,5 +67,3 @@ export class NavbarResp extends React.Component {
     )
   }
 }
-
-export default NavbarResp

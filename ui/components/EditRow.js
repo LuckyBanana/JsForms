@@ -6,10 +6,11 @@ import {
   DropdownInputCell,
   FileInputCell,
   HtmlInputCell,
+  NumberInputCell,
   TextInputCell,
 } from './CellInputs.js'
 
-import { DELETE, GET, POST } from '../utils/api'
+import { POST } from '../utils/api'
 
 export default class EditRow extends React.Component {
   constructor(props, context) {
@@ -17,10 +18,10 @@ export default class EditRow extends React.Component {
     this.hideForm = this.hideForm.bind(this)
     this.submitForm = this.submitForm.bind(this)
     this.handleInputChange = this.handleInputChange.bind(this)
-    var initialState = this.props.definition.map(field => {
+    const initialState = this.props.definition.map(field => {
       if (field.name !== 'id' ) {
-        var enrField = field
-        enrField.editValue = this.props.data !== undefined ? this.props.data[field.name] : null
+        let enrField = field
+        enrField.editValue = this.props.data !== undefined ? this.props.data[field.name] : this.defaultFieldValue(field)
         enrField.inputId = this.props.objectId + '_' + field.id
         enrField.errForm = false
         return enrField
@@ -29,6 +30,15 @@ export default class EditRow extends React.Component {
     this.state = {
       fields: initialState,
       displayRow: true
+    }
+  }
+
+  defaultFieldValue(field) {
+    if(field.required) {
+      return field.type === 'Boolean' ? false : null
+    }
+    else {
+      return field.type === 'Boolean' ? false : ''
     }
   }
 
@@ -42,12 +52,12 @@ export default class EditRow extends React.Component {
   }
 
   submitForm() {
-    var validateForm = true
-    var fields = this.state.fields
-    var formData = {}
+    let validateForm = true
+    const { fields } = this.state
+    let formData = {}
     for (const field of fields) {
       if (field !== undefined) {
-        if (field.editValue === null) {
+        if(field.required && field.editValue === null) {
           field.errForm = true
           validateForm = false
         }
@@ -112,7 +122,8 @@ export default class EditRow extends React.Component {
     const row = this.props.definition.map(field => {
       const baseValue = this.props.mode === 'edit' ? this.props.data[field.name] : ''
       const inputId = this.props.objectId + '-' + field.id
-      if (['id', 'valid'].indexOf(field.name) === -1 && !(field.name.indexOf('id_') === 0 && !field.foreign)) {
+      //if (['id', 'valid'].indexOf(field.name) === -1 || field.hidden) {
+      if(!field.hidden) {
         if(field.foreign) {
           return (
             <DropdownInputCell

@@ -16,6 +16,16 @@ export class TextInputCell extends React.Component {
     this.state = { value: null }
   }
 
+  getInputType(type) {
+    return {
+      'String': 'text',
+      'Number': 'number',
+      'Password': 'password',
+      'Url': 'url',
+      'Email': 'mail'
+    }[type]
+  }
+
   handleChange(event) {
     this.setState({ value: event.target.value })
     this.props.handleChange(this.props.field.id, event.target.value)
@@ -32,7 +42,46 @@ export class TextInputCell extends React.Component {
           validationState={this.props.field.errForm ? 'error' : null}
           style={{ margin: '0px' }}
         >
-          <FormControl type="text" onChange={this.handleChange} value={this.state.value} />
+          <FormControl
+            type={this.getInputType(this.props.field.type)}
+            onChange={this.handleChange}
+            value={this.state.value}
+          />
+          {this.props.field.errForm ? <FormControl.Feedback /> : null}
+        </FormGroup>
+      </td>
+    )
+  }
+}
+
+export class NumberInputCell extends React.Component {
+  constructor(props) {
+    super(props)
+    this.handleChange = this.handleChange.bind(this)
+    this.state = { value: null }
+  }
+
+  handleChange(event) {
+    this.setState({ value: event.target.value })
+    this.props.handleChange(this.props.field.id, event.target.value)
+  }
+
+  componentDidMount() {
+    this.setState({ value: this.props.data })
+  }
+
+  render() {
+    return (
+      <td>
+        <FormGroup
+          validationState={this.props.field.errForm ? 'error' : null}
+          style={{ margin: '0px' }}
+        >
+          <FormControl
+            type='number'
+            onChange={this.handleChange}
+            value={this.state.value}
+          />
           {this.props.field.errForm ? <FormControl.Feedback /> : null}
         </FormGroup>
       </td>
@@ -201,7 +250,7 @@ export class DropdownInputCell extends React.Component {
           })
         )
         this.setState({
-          cols: cols,
+          cols: this.props.field.required ? cols : [{ selected: false, value: '', colId: null}, ...cols],
           referencedObjectApiUrl: referencedObjectApiUrl,
           referencedField: referencedField
         })

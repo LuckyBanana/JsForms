@@ -12,22 +12,16 @@ const GET_REQ = () => {
 }
 
 const POST_REQ = (formData, toJson) => {
-  const headers = toJson ?
-    {
-      'Accept': 'application/json',
-      'Content-Type': toJson ? 'application/json' : '',
-      // 'Authorization': 'Bearer ' + auth.getToken()
-    } :
-    {
-      'Accept': 'application/json',
-      // 'Authorization': 'Bearer ' + auth.getToken()
-    }
   return {
-      headers: headers,
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': toJson ? 'application/json' : '',
+        // 'Authorization': 'Bearer ' + auth.getToken()
+      },
       method: 'POST',
       mode: 'cors',
       cache: 'default',
-      body: toJson ? JSON.stringify(formData) : formData
+      body: JSON.stringify(formData)
     }
 }
 

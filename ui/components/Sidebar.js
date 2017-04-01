@@ -17,7 +17,7 @@ export default class Sidebar extends React.Component {
     Object.keys(groups).forEach(i => groups[i].items = [])
 
     const menuEntries = this.props.data.map((object, index) => {
-      if (object.groupId === '') {
+      if (object.groupId === null) {
         return (
           <MenuEntry
             objectId={object.id}
@@ -40,14 +40,16 @@ export default class Sidebar extends React.Component {
       .map(i => groups[i])
       .sort((a, b) => a.definition.pos - b.definition.pos)
       .map(group => {
-        return (
-          <MenuGroup
-            group={group}
-            activeObject={this.props.activeObject}
-            key={group.definition.id + '-grouplink'}
-            updateView={this.props.handlers.updateView}
-          />
-        )
+        if(group === undefined || group.items.length > 0) {
+          return (
+            <MenuGroup
+              group={group}
+              activeObject={this.props.activeObject}
+              key={group.definition.id + '-grouplink'}
+              updateView={this.props.handlers.updateView}
+            />
+          )
+        }
       })
     return (
       <div className="navbar-default sidebar" role="navigation" id="sidebar">

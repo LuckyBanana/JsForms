@@ -60,6 +60,26 @@ module.exports = (data) => {
 		})
 	})
 
+	app.route('/api/:apiUrl')
+		.get(isValidRoute, (req, res) => {
+			console.log(req.query);
+			DbLib.getAll(req.object, (rows) => {
+				res.send(rows)
+			})
+		})
+		.put(isValidRoute, (req, res) => {
+			DbLib.postCreate(req.object, req.body, (rows) => {
+				res.send(rows)
+			})
+		})
+		.post(isValidRoute, (req, res) => {
+
+		})
+		.delete(isValidRoute, (req, res) => {
+			DbLib.postDelete(req.object, req.params.id, (rows) => {
+				res.send(rows)
+			})
+		})
 
 
 	app.get('/api/limit/:apiUrl/:page', isValidRoute, (req, res) => {
@@ -75,7 +95,7 @@ module.exports = (data) => {
 	})
 
 	app.get('/api/get/:apiUrl/:id', isValidRoute, (req, res) => {
-		DbLib.getAll(req.object, {id: req.params.id}, (rows) => {
+		DbLib.getAll(req.object, { id: req.params.id }, (rows) => {
 			res.send(rows)
 		})
 	})
@@ -83,6 +103,7 @@ module.exports = (data) => {
 	/** POST ROUTES **/
 
 	app.post('/api/create/:apiUrl', isValidRoute, (req, res) => {
+		console.log(req.object);
 		DbLib.postCreate(req.object, req.body, (rows) => {
 			res.send(rows)
 		})
@@ -121,11 +142,11 @@ module.exports = (data) => {
 		});
 	});
 
-	app.get('/api/maintenance/usedgroups', function (req, res) {
-		DbLib.getUsedGroups(!configFile.devMode, (data) => {
-			res.send(data);
-		});
-	});
+	// app.get('/api/maintenance/usedgroups', function (req, res) {
+	// 	DbLib.getUsedGroups(!configFile.devMode, (data) => {
+	// 		res.send(data);
+	// 	});
+	// });
 
 	app.post('/api/maintenance/addview', function (req, res) {
 		DbLib.addView(req.body, function (data) {
@@ -222,7 +243,7 @@ module.exports = (data) => {
 	});
 
 	app.get('/api/init/view/:id', function (req, res) {
-		DbLib.updateViewObjects({id: req.params.id}, function (data) {
+		DbLib.updateViewObjects({ id: req.params.id }, function (data) {
 			res.send(data)
 		})
 	})
@@ -282,7 +303,7 @@ module.exports = (data) => {
 	function requireAdmin(req, res, next) {
 		if(req.user) {
 			if(req.user.level < 2) {
-				res.status(401).send({msg: 'KO', detail: 'Insufficient rights.'})
+				res.status(401).send({ msg: 'KO', detail: 'Insufficient rights.' })
 			}
 			else {
 				next()

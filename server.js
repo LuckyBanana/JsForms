@@ -7,10 +7,10 @@
  *  >
  *  > CORRESPONDANCE ENTRE LES DATADEFAULTS ET LES DATATYPES (TYPE DES DATADEFAULTS)
  *  > IDENTIFICATION : CONSULTATION, MODIFICATION, ADMINISTRATION >> EN COURS
- * 	> TRADUCTION >> oui oui
+ * 	>
  *	>
- *	> ESPACES DANS LES NOMS DE TABLES : VERIFICATION LORS DE LA CREATION : Interdire ou underscore ? > Pas d'underscore sinon bug menu
- *	>	>> A la creation remplacer underscore et espace dans view_id par un char vide.
+ *	>
+ *	>
  *	> CODES D'ERREUR DANS LES CALLBACK (GESTION PLUS FINE QUE OK, KO) >> Renvoyer l'objet entier sur OK > Quasiment fait
  *	>
  *	>
@@ -20,24 +20,24 @@
  *	>
  *	>
  *	>
- *	> CATEGORIES DE VUES / VIEW GROUPS
+ *	>
  *	>
  *	> Niveaux d'accès : fonctionnalités, vues, groupes
- *	> Bouton changer le label d'une vue
  *	>
  *	>
  *	>
  *	>
  *	>
  *	>
- *	> Tester les functions Updater avec la nouvelle archi. : ok
+ *	>
+ *	>
  *	> File upload >> Coté client aussi...
  *	> route : maintenance/function non utilisée >> que faire avec ?
  *	>
  *	>
  *	>
  *	>
- *	> Faire le tri des choses inutiles : fonctions, imports, fichiers js, node_modules >> Partiellement fait (reste node_modules)
+ *	>
  *	>
  *	> A la création d'une table ajouter une box 'coloration ?' (ou niveaux)
  *	>	> Ajoute un champ spécial dans la table pour spécifier le niveau et la couleur.
@@ -56,41 +56,41 @@
  *	>
  *	> File upload générique
  *	>
- *	> typeof callback === 'function' && callback(); >> OK sauf sur les ternaires
+ *	> 
  *	>
  *	> Patchs pour les bases de données > Nouveaux champs, .. > Faciliter les montées de version
  *	>	>> Parent Group et Custom (__OBJECT) + Config de base dans une db
  *	>
  *	> Vérifier les enable/disable
  *	>
- *	> Knex/Bookshelf as db driver ? >> Knex en cours
+ *	>
  *	> Unification des retours {msg : 'OK' | 'KO', obj: [] | 'Err msg'} >> Back + Front
- *	> Bug html select sur les foreign >> Surement un == 1 ou == "1" > a tester avec les nouveaux opérateurs de comparaison
- *	> Test postCreate avec foreign
+ *	>
+ *	>
  *	> Refresh apres insert
  *	> Chargement de la config de bd generique
- *	> Migrer les custom libs en KNEX
+ *	>
  *	> schema, tables, fields to lowercase ? >> OK
  *	>
- *	> Terminer la migration vers Knex (fonctions complexes)
+ *	>
  *	>
  *	> Bootstrap les écrans de config avec le FW
  *	>	-> Deux type d'écrans à prévoir ; Tableau (standard) / Formulaire (avec différents types d'objets)
- *	> -> Nécessité de mettre les groupes en place pour répartir les écrans de conf : OK
  *	>
- *	> Bascule de l'ouverture de connexion et du passport dans la DbLib
- *	>	-> Ok pour Knex, à faire pour les autres
  *	>
- *	>	Diviser le fichier de confif
+ *	>
+ *	>
+ *	>
+ *	>	Diviser le fichier de conf
  *	> -> Un fichier pour les params généraux (fichier d'entrée)
  *	> -> Des fichiers séparer pour la conf des modules (db, functions custom)
  *	>
- *	> Passage à React en front ?
+ *	>
  *	>
  *	> Field prop -> isNullable
  *	>
  *	> Documentation de l'API !!
- *	> Chanmp checkbox ?
+ *	>
  *	>
  *	>
  *	>

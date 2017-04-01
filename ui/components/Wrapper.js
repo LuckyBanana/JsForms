@@ -47,7 +47,7 @@ export default class Wrapper extends React.Component {
   }
 
   getUsedGroups() {
-    GET('/api/maintenance/usedgroups')
+    GET('/api/get/objectgroup')
       .then(data => {
         const groups = {}
         for (let i in data) {

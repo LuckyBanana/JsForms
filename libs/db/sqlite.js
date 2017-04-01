@@ -32,36 +32,27 @@ exports.getAll = (...args) => {
 		}
 	}
 
-	let query = "SELECT \
-		CASE WHEN T1.HASJOIN > 0 THEN \
-		CASE WHEN F.ISFOREIGN THEN \
-		RO.ALIAS || F.ID_FIELD || '.' || RF.NAME \
-		ELSE \
-		CASE WHEN DT.NAME = 'Date' THEN \
-		'STRFTIME(\"%Y/%m/%d %H:%M\", ' || O.ALIAS || '.' || F.NAME || ')' \
-		ELSE O.ALIAS || '.' || F.NAME END \
-		END \
-		ELSE \
-		CASE WHEN DT.NAME = 'Date' THEN \
-		'STRFTIME(\"%Y/%m/%d %H:%M\", ' || F.NAME || ')' \
-		ELSE \
-		F.NAME \
-		END \
-		END AS 'field', \
-		CASE WHEN F.ISFOREIGN = 1 \
-		THEN 'LEFT JOIN ' || RO.SCHEMA || '.' || RO.NAME || ' ' || RO.ALIAS || F.ID_FIELD || ' ON ' || O.ALIAS || '.' || F.NAME || ' = ' || RO.ALIAS || F.ID_FIELD || '.ID' || CASE WHEN RO.SCHEMA = 'CONF' COLLATE NOCASE THEN '_' || RO.NAME ELSE '' END \
-		ELSE '' END AS 'join', \
-		F.NAME AS 'name', \
-		DT.NAME as 'type' \
+	let query =	"SELECT \
+			CASE WHEN F.ISFOREIGN THEN \
+				RO.ALIAS || F.ID || '.' || RF.NAME \
+			ELSE \
+				O.ALIAS || '.' || F.NAME \
+			END AS 'field', \
+			CASE WHEN F.ISFOREIGN = 1 THEN \
+				'LEFT JOIN ' || RS.NAME || '.' || RO.NAME || ' ' || RO.ALIAS || F.ID || \
+				' ON ' || O.ALIAS || '.' || F.NAME || ' = ' || RO.ALIAS || F.ID || '.ID' \
+			ELSE \
+				'' \
+			END AS 'join', \
+			F.NAME AS 'name', \
+			DT.NAME as 'type' \
 		FROM CONF.FIELD F \
-		INNER JOIN (\
-			SELECT SUM(F.ISFOREIGN) AS HASJOIN FROM CONF.FIELD F WHERE F.PARENT_OBJECT = :id_object\
-		) T1 ON 1 \
-		JOIN CONF.OBJECT O ON F.PARENT_OBJECT = O.ID_OBJECT \
-		JOIN CONF.DATATYPE DT ON F.DATATYPE = DT.ID_DATATYPE \
-		LEFT JOIN CONF.DATADEFAULT DD ON F.DATADEFAULT = DD.ID_DATADEFAULT \
-		LEFT JOIN CONF.OBJECT RO ON F.REFERENCED_OBJECT = RO.ID_OBJECT \
-		LEFT JOIN CONF.FIELD RF ON F.REFERENCED_FIELD = RF.ID_FIELD \
+		INNER JOIN CONF.OBJECT O ON F.PARENT_OBJECT = O.ID \
+		INNER JOIN CONF.DATATYPE DT ON F.DATATYPE = DT.ID \
+		LEFT JOIN CONF.DATADEFAULT DD ON F.DATADEFAULT = DD.ID \
+		LEFT JOIN CONF.OBJECT RO ON F.REFERENCED_OBJECT = RO.ID \
+		LEFT JOIN CONF.SCHEMA RS ON RO.SCHEMA = RS.ID \
+		LEFT JOIN CONF.FIELD RF ON F.REFERENCED_FIELD = RF.ID \
 		WHERE F.PARENT_OBJECT = :id_object \
 		ORDER BY F.POS ASC;"
 
@@ -95,7 +86,7 @@ exports.getAll = (...args) => {
 		fieldString = __removeLastChar(fieldString)
 
 		query = 'SELECT ' + fieldString + ' FROM ' + object.schema +  '.' + object.name + ' ' + object.alias  + ' ' + joinString
-		query += object.schema.toUpperCase() === 'CONF' ? ' WHERE ' + object.alias + '.ID_' + object.name + ' > 100' : ''
+		//query += object.schema.toUpperCase() === 'CONF' ? ' WHERE ' + object.alias + '.ID > 100' : ''
 		query += (params.id && !(params.id instanceof Function)) ?
 			(object.schema === 'CONF' ? ' AND ' : ' WHERE ') + ' ' + object.alias + '.ID = ' + params.id :
 			''
@@ -107,6 +98,7 @@ exports.getAll = (...args) => {
 				callback([])
 				return
 			}
+			console.log(rows);
 			typeof callback === 'function' && callback(rows)
 		})
 	})
@@ -120,21 +112,21 @@ exports.getCount = (object, callback) => {
 }
 
 exports.getGroups = (callback) => {
-	const query = 'SELECT ID_OBJECTGROUP AS id, NAME AS name FROM CONF.OBJECTGROUP WHERE VALID = 1 ORDER BY POS ASC;'
+	const query = 'SELECT ID AS id, NAME AS name FROM CONF.OBJECTGROUP WHERE VALID = 1 ORDER BY POS ASC;'
 	db.query(query, (rows) => {
 		typeof callback === 'function' && callback(rows)
 	})
 }
 
 exports.getUsedGroups = (prod, callback) => {
-	const query = 'SELECT DISTINCT CG.ID_OBJECTGROUP id, CG.NAME name, CG.POS pos, CG.VALID valid FROM CONF.OBJECT CO INNER JOIN CONF.OBJECTGROUP CG ON CG.ID_OBJECTGROUP = CO.PARENT_GROUP WHERE VALID = 1 ' + (prod ? 'AND ID_OBJECTGROUP >= 100' : '') + ' ORDER BY CG.POS ASC'
+	const query = 'SELECT DISTINCT CG.ID id, CG.NAME name, CG.POS pos, CG.VALID valid FROM CONF.OBJECT CO INNER JOIN CONF.OBJECTGROUP CG ON CG.ID = CO.PARENT_GROUP WHERE VALID = 1 ' + (prod ? 'AND ID >= 100' : '') + ' ORDER BY CG.POS ASC'
 	db.query(query, { id: Number, name: String, pos: Number, valid: Boolean }, (rows) => {
 		typeof callback === 'function' && callback(rows)
 	})
 }
 
 exports.getGroupObjects = (prod, callback) => {
-	const query = 'SELECT CG.ID_OBJECTGROUP AS groupId, CG.NAME groupName, CG.POS AS groupPos, CO.ID_OBJECT objectId, CO.NAME objectName, CO.LABEL AS objectLabel, CO.POS AS objectPos FROM CONF.OBJECT CO JOIN CONF.OBJECTGROUP CG ON CO.PARENT_GROUP = CG.ID_OBJECTGROUP ORDER BY CG.POS ASC;'
+	const query = 'SELECT CG.ID AS groupId, CG.NAME groupName, CG.POS AS groupPos, CO.ID objectId, CO.NAME objectName, CO.LABEL AS objectLabel, CO.POS AS objectPos FROM CONF.OBJECT CO JOIN CONF.OBJECTGROUP CG ON CO.PARENT_GROUP = CG.ID ORDER BY CG.POS ASC;'
 	db.query(query, (rows) => {
 		typeof callback === 'function' && callback(rows)
 	})
@@ -142,7 +134,7 @@ exports.getGroupObjects = (prod, callback) => {
 /** POST QUERIES **/
 
 exports.postCreate = function(object, params, callback) {
-
+	console.log(object, params);
 	if (arguments.length == 2) {
 		if (params instanceof Function) {
 			callback = params;
@@ -298,7 +290,7 @@ exports.addColumn = (data, callback) => {
 	let result = {name: false, label: false}
 	const query = 'SELECT F.NAME = :name AS "name", F.LABEL = :label AS "label" FROM CONF.FIELD F WHERE F.PARENT_OBJECT = (SELECT O.ID_OBJECT FROM CONF.OBJECT O WHERE O.NAME = :objectName);'
 	var alterQuery = ''
-	var result_set = {name: Number, label: Number}
+	var result_set = { name: Number, label: Number }
 	var params = {name: data.columnIdInput, label: data.columnLabelInput, objectName: data.objectName}
 	db.query(query, params, (err, rows) => {
 		if (err) {
@@ -580,7 +572,7 @@ exports.editObjectOrder = (data, callback) => {
 /** USERS **/
 
 exports.getAllUsers = (callback) => {
-	var query = 'SELECT ID_USER AS id, LOGIN AS login, LEVEL AS level, ACTIVE AS active FROM CONF.USER WHERE LEVEL < 99;';
+	var query = 'SELECT ID AS id, LOGIN AS login, LEVEL AS level, ACTIVE AS active FROM CONF.USER WHERE LEVEL < 99;';
 	db.query(query, (err, rows) => {
 		typeof callback === 'function' && callback(rows)
 	});
@@ -602,21 +594,21 @@ exports.createUser = (data, callback) => {
 }
 
 exports.modifyUser = (id, data, callback) => {
-	var query = 'UPDATE CONF.USER SET LEVEL = :level WHERE ID_USER = :id;'
+	var query = 'UPDATE CONF.USER SET LEVEL = :level WHERE ID = :id;'
 	db.query(query, { id: id, level: data.userLevelModify }, (err, rows) => {
 		err ? callback({ msg: 'KO', detail: err }) : callback({ msg: 'OK' })
 	})
 }
 
 exports.deleteUser = (id, callback) => {
-	var query = 'DELETE FROM CONF.USER WHERE ID_USER = :id;'
+	var query = 'DELETE FROM CONF.USER WHERE ID_ = :id;'
 	db.query(query, { id: id }, (err, rows) => {
 		err ? callback({ msg: 'KO', detail: err }) : callback({ msg: 'OK' })
 	})
 }
 
 exports.activateUser = (id, callback) => {
-	var query = 'UPDATE CONF.USER SET ACTIVE = CASE WHEN ACTIVE = 0 THEN 1 ELSE 0 END WHERE ID_USER = :id';
+	var query = 'UPDATE CONF.USER SET ACTIVE = CASE WHEN ACTIVE = 0 THEN 1 ELSE 0 END WHERE ID = :id';
 	db.query(query, { id: id }, function (err, rows) {
 		err ? callback({msg: 'KO', detail: err}) : callback({ msg: 'OK' });
 	});
@@ -624,8 +616,8 @@ exports.activateUser = (id, callback) => {
 
 /** CONFIGURATION **/
 
-const SCHEMA_QUERY = "SELECT O.ID_OBJECT id, \
-				 O.SCHEMA schema, \
+const SCHEMA_QUERY = "SELECT O.ID id, \
+				 S.NAME schema, \
 				 O.NAME name, \
 				 O.LABEL label, \
 				 O.ALIAS alias, \
@@ -635,17 +627,18 @@ const SCHEMA_QUERY = "SELECT O.ID_OBJECT id, \
 				 O.ISACTIVABLE activable, \
 				 O.POS pos, \
 				 G.NAME \"group\", \
-				 G.ID_OBJECTGROUP groupId, \
+				 G.ID groupId, \
 				 O.CUSTOM custom, \
 				 O.ISFORM \"isform\", \
 				 COALESCE(F.FIELDS, JSON_ARRAY() ) fields \
 FROM OBJECT O \
+INNER JOIN SCHEMA S ON O.SCHEMA = S.ID \
 LEFT JOIN ( \
 		SELECT PARENT_OBJECT, \
-						 JSON_GROUP_ARRAY(JSON_OBJECT('id', ID_FIELD, 'name', NAME, 'label', LABEL, 'type', DATATYPE, \ 'generated', ISGENERATED, 'default', DATADEFAULT, 'foreign', ISFOREIGN, 'referencedObject', REFERENCED_OBJECT, 'referencedField', REFERENCED_FIELD, 'pos', POS, 'parentObject', PARENT_OBJECT, 'hidden', HIDDEN, 'required', REQUIRED) ) FIELDS \
+						 JSON_GROUP_ARRAY(JSON_OBJECT('id', ID, 'name', NAME, 'label', LABEL, 'type', DATATYPE, \ 'generated', ISGENERATED, 'default', DATADEFAULT, 'foreign', ISFOREIGN, 'referencedObject', REFERENCED_OBJECT, 'referencedField', REFERENCED_FIELD, 'pos', POS, 'parentObject', PARENT_OBJECT, 'hidden', HIDDEN, 'required', REQUIRED) ) FIELDS \
 				FROM ( \
 						SELECT F.PARENT_OBJECT, \
-						 F.ID_FIELD, \
+						 F.ID, \
 						 F.NAME, \
 						 F.LABEL, \
 						 DT.NAME AS DATATYPE, \
@@ -659,14 +652,14 @@ LEFT JOIN ( \
 						 F.REQUIRED \
 				FROM FIELD F \
 						 LEFT JOIN \
-						 DATATYPE DT ON F.DATATYPE = DT.ID_DATATYPE \
+						 DATATYPE DT ON F.DATATYPE = DT.ID \
 						 LEFT JOIN \
-						 DATADEFAULT DD ON F.DATADEFAULT = DD.ID_DATADEFAULT \
+						 DATADEFAULT DD ON F.DATADEFAULT = DD.ID \
 			 ORDER BY F.POS \
 		 ) FIELDS \
 			 GROUP BY PARENT_OBJECT \
-) F ON O.ID_OBJECT = F.PARENT_OBJECT \
-LEFT JOIN OBJECTGROUP G ON O.PARENT_GROUP = G.ID_OBJECTGROUP"
+) F ON O.ID = F.PARENT_OBJECT \
+LEFT JOIN OBJECTGROUP G ON O.PARENT_GROUP = G.ID"
 
 const SCHEMA_TYPES = {
 	id: Number,
@@ -680,7 +673,9 @@ const SCHEMA_TYPES = {
 	activable: Boolean,
 	pos: Number,
 	group: String,
-	groupId: String,
+	groupId: (groupId) => {
+		return groupId === '' ? null : Number(groupId)
+	},
 	custom: Boolean,
 	isform: Boolean,
 	fields: (fieldValue) => {
@@ -707,9 +702,9 @@ exports.updateViewObjects = function (params, callback) {
 	}
 
 	let query = SCHEMA_QUERY
-	query += params.id ? ' WHERE id = :id' : ''
-	query += params.defaultObject ? ' WHERE "default" = 1' : ''
-	query += params.prod ? ' WHERE ID_OBJECT >= 100' : ''
+	query += params.id ? ' WHERE O.ID = :id' : ''
+	query += params.defaultObject ? ' WHERE O."default" = 1' : ''
+	query += params.prod ? ' WHERE O.ID >= 100' : ''
 	query += ' ORDER BY O.POS;'
 
 	db.query(query,	params,	SCHEMA_TYPES,	(err, rows) => {
@@ -720,7 +715,7 @@ exports.updateViewObjects = function (params, callback) {
 
 exports.isValidRoute = (apiUrl, callback) => {
 	const query = SCHEMA_QUERY + ' WHERE apiUrl = :apiUrl'
-	db.query(query, {apiUrl: '/' + apiUrl},	SCHEMA_TYPES,	(err, rows) => {
+	db.query(query, { apiUrl: '/' + apiUrl },	SCHEMA_TYPES,	(err, rows) => {
 			typeof callback === 'function' && callback(rows[0]);
 	})
 }
@@ -728,7 +723,7 @@ exports.isValidRoute = (apiUrl, callback) => {
 /** AUTHENTICATION **/
 
 exports.authenticate = function (username, password, done) {
-	const query = 'SELECT id_user as "id_user", login as "login", level as "level" FROM CONF.USER WHERE login = :user and password = :pass'
+	const query = 'SELECT id as "id_user", login as "login", level as "level" FROM CONF.USER WHERE login = :user and password = :pass'
 	db.query(query,	{ user: username, pass: password }, (err, rows) => {
 			if(rows.length === 0) {
 				return done(null, false, {message: 'Cannot authenticate user.'})
@@ -743,7 +738,7 @@ exports.authenticate = function (username, password, done) {
 }
 
 exports.deserializeUser = function (id, done) {
-	const query = 'select id_user as "id_user", login as "login", level as "level" FROM CONF.USER WHERE id_user = :id_user'
+	const query = 'select id as "id_user", login as "login", level as "level" FROM CONF.USER WHERE id = :id_user'
 	db.query(query, { id_user: id }, (err, rows) => {
 		done(null, rows[0])
 	})

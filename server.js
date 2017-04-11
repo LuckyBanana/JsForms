@@ -56,7 +56,7 @@
  *	>
  *	> File upload générique
  *	>
- *	> 
+ *	>
  *	>
  *	> Patchs pour les bases de données > Nouveaux champs, .. > Faciliter les montées de version
  *	>	>> Parent Group et Custom (__OBJECT) + Config de base dans une db
@@ -192,8 +192,6 @@ const compress = require('compression')
 const config = require('config')
 const https = require('https')
 const cluster = require('cluster')
-const jwt = require('express-jwt')
-
 
 /** SERVER **/
 
@@ -236,7 +234,7 @@ const startServer = (configFile) => {
 	const releases = multer({dest: __dirname + '/uploads/releases'})
 
 	const DbLib = require(configFile.databaseLib)
-	const auth = jwt({ secret: 'jsforms' })
+
 
 	DbLib.openDb(configFile.databaseSystem, config)
 	app.use(helmet())
@@ -249,6 +247,13 @@ const startServer = (configFile) => {
 	app.use(flash())
 	app.use(passport.initialize())
 	app.use(passport.session())
+	app.use((req, res, next) => {
+	    res.setHeader('Access-Control-Allow-Origin', configFile.allowedRemoteHosts.join(' '))
+	    res.setHeader('Access-Control-Allow-Methods', configFile.allowedRemoteMethods.join(', '))
+	    res.setHeader('Access-Control-Allow-Headers', 'X-Requested-With,content-type')
+	    res.setHeader('Access-Control-Allow-Credentials', true)
+    	next()
+	})
 
 	app.engine('mst', mustacheExpress())
 	app.set('views', 'views')
@@ -292,7 +297,8 @@ const startServer = (configFile) => {
 	/** ROUTES **/
 
 	loadCustomRoutes(app, configFile)
-	require('./routes/main.js')({app: app, passport: passport, auth: auth, dblib: DbLib, conf: configFile, storage: releases})
+	app.use('/api', require('./routes/main'))
+	// require('./routes/main.js')({app: app, passport: passport, dblib: DbLib, conf: configFile, storage: releases})
 }
 
 const loadConfigFile = _ => {
@@ -323,6 +329,10 @@ const loadConfigFile = _ => {
 	configFile.authenticationMethod = config.has('Authentication') ? config.get('Authentication') : 'standard'
 
 	return configFile
+}
+
+const validateConfigFile = _ => {
+
 }
 
 // Custom functions and routes definition

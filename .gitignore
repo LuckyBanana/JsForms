@@ -10,6 +10,7 @@ uploads/releases/*
 libs/custom/*
 !libs/custom/custom.js
 
+routes/oldmain.js
 routes/custom/*
 !routes/custom/custom.js
 

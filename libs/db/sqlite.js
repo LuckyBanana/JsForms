@@ -1,3 +1,4 @@
+const api = require('../../utils/api')
 
 exports.openDb = (type, config) => {
 	const dblite = require('dblite')
@@ -60,7 +61,7 @@ exports.getAll = (...args) => {
 	let fieldString = ''
 	let joinString = ''
 
-	db.query(query, {id_object: object.id}, (err, rows) => {
+	db.query(query, { id_object: object.id }, (err, rows) => {
 		if(err) {
 			console.error(err);
 			callback([])
@@ -98,7 +99,6 @@ exports.getAll = (...args) => {
 				callback([])
 				return
 			}
-			console.log(rows);
 			typeof callback === 'function' && callback(rows)
 		})
 	})

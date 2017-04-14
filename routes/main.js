@@ -5,7 +5,6 @@ const config = require('config')
 const jwt = require('express-jwt')
 const execFile = require('child_process').execFile
 
-// const Lib = require('../libs/lib.js')
 const DbLib = require(path.join(__dirname, '..', 'libs', 'db', config.get('App.DatabaseDriver') + '.js'))
 const api = require('../utils/api')
 
@@ -14,33 +13,47 @@ const auth = jwt({ secret: 'jsforms' })
 
 /** ROUTE VALIDATION **/
 
+// MIDDLEWARE CHECKING IF REQUESTED ROUTE EXISTS
 const isValidRoute = (req, res, next) => {
-	console.log(req.params);
 	DbLib.isValidRoute(req.params.apiUrl, (object) => {
 		if(object !== undefined) {
 			req.object = object
 			next()
 		}
 		else {
-			res.status(404)
-			res.render('404')
+			res.status(404).send(api.error('Requested object does not exist.'))
 		}
 	})
 }
 
+// MIDDLEWARE CHECKING IF REQUESTED ID IS NUMERIC
+const parseId = (req, res, next) => {
+	console.log(req.params);
+	if(['POST', 'DELETE'].indexOf(req.method.toUpperCase()) !== -1 && req.params.id === undefined) {
+		res.status(400).send(api.error(`${req.method} method requires an object to modify.`))
+	}
+	else if(req.params.id !== undefined && !parseInt(req.params.id)) {
+		res.status(400).send(api.error('Id must be numeric'))
+		return
+	}
+	else {
+		next()
+	}
+}
+
 /** API **/
 
+router.get('/init/:id?', parseId, (req, res) => {
+	DbLib.getViewObjects({ prod: false, id: req.params.id }, (data) => {
+		res.send(data)
+	})
+})
+
 router.route('/:apiUrl/:id?')
-	.get(isValidRoute, (req, res) => {
-		console.log(req.params)
-		console.log(req.query);
-		if(req.params.id !== undefined && parseInt(req.params.id)) {
-			console.log('ok');
-		}
-		else {
-			console.log('ko');
-		}
-		DbLib.getAll(req.object, req.query, (data) => {
+	.get(isValidRoute, parseId, (req, res) => {
+		const params = req.query || {}
+		params.id = req.params.id
+		DbLib.getAll(req.object, params, (data) => {
 			res.send(data)
 		})
 	})
@@ -49,10 +62,10 @@ router.route('/:apiUrl/:id?')
 			res.send(data)
 		})
 	})
-	.post(isValidRoute, (req, res) => {
-
+	.post(isValidRoute, parseId, (req, res) => {
+		res.send(api.success('TEST'))
 	})
-	.delete(isValidRoute, (req, res) => {
+	.delete(isValidRoute, parseId, (req, res) => {
 		if(req.params.id !== undefined && parseInt(req.params.id)) {
 			DbLib.postDelete(req.object, req.params.id, (data) => {
 				res.send(data)
@@ -62,10 +75,6 @@ router.route('/:apiUrl/:id?')
 			res.status(400).send(api.error('DELETE method requires an object to modify.'))
 		}
 	})
-
-router.get('/init', (req, res) => {
-
-})
 
 // router.use((req, res, next) => {
 // 	console.log(req);

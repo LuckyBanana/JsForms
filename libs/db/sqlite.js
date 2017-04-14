@@ -1,4 +1,6 @@
 const api = require('../../utils/api')
+const logger = require('../../utils/logging')
+const sql = require('../../utils/sql')
 
 exports.openDb = (type, config) => {
 	const dblite = require('dblite')
@@ -8,19 +10,15 @@ exports.openDb = (type, config) => {
 	return db
 }
 
-
 /** GET QUERIES **/
-// Params :
-	// id: "getOneById",
-	// page: "20 résultats par page",
-	// condition: "Sql query condition"
 
 /**
  *	Récupère les données d'un objet passé en paramètre
  * @param {object} object - La définition de l'objet recherché
- * @param {object} params - Les critères de recherche {id, page, conditionSql}
+ * @param {object} params - Les critères de recherche {id, page, size, sort, filter, fields}
  * @param {function} callback
  */
+const GET_ALL = sql(require('path').join('sql', 'GET_ALL.sql'))
 exports.getAll = (...args) => {
 	let [ object, params, callback ] = args
 
@@ -33,29 +31,19 @@ exports.getAll = (...args) => {
 		}
 	}
 
-	let query =	"SELECT \
-			CASE WHEN F.ISFOREIGN THEN \
-				RO.ALIAS || F.ID || '.' || RF.NAME \
-			ELSE \
-				O.ALIAS || '.' || F.NAME \
-			END AS 'field', \
-			CASE WHEN F.ISFOREIGN = 1 THEN \
-				'LEFT JOIN ' || RS.NAME || '.' || RO.NAME || ' ' || RO.ALIAS || F.ID || \
-				' ON ' || O.ALIAS || '.' || F.NAME || ' = ' || RO.ALIAS || F.ID || '.ID' \
-			ELSE \
-				'' \
-			END AS 'join', \
-			F.NAME AS 'name', \
-			DT.NAME as 'type' \
-		FROM CONF.FIELD F \
-		INNER JOIN CONF.OBJECT O ON F.PARENT_OBJECT = O.ID \
-		INNER JOIN CONF.DATATYPE DT ON F.DATATYPE = DT.ID \
-		LEFT JOIN CONF.DATADEFAULT DD ON F.DATADEFAULT = DD.ID \
-		LEFT JOIN CONF.OBJECT RO ON F.REFERENCED_OBJECT = RO.ID \
-		LEFT JOIN CONF.SCHEMA RS ON RO.SCHEMA = RS.ID \
-		LEFT JOIN CONF.FIELD RF ON F.REFERENCED_FIELD = RF.ID \
-		WHERE F.PARENT_OBJECT = :id_object \
-		ORDER BY F.POS ASC;"
+	let query = GET_ALL
+
+	// REQUESTED FIELDS
+	if(params.fields && !(params.fields instanceof Function)) {
+		const requestedFields = object.fields.filter(e => params.fields.split(',').indexOf(e.name) !== -1)
+		if(requestedFields.length > 0) {
+			query += ' AND (' + requestedFields.map(f => " F.NAME = '" + f.name + "'").join('OR') + ')'
+		}
+	}
+
+	query += ' ORDER BY F.POS ASC;'
+
+	logger.debug(query)
 
 	let join = false
 	let fieldString = ''
@@ -63,8 +51,8 @@ exports.getAll = (...args) => {
 
 	db.query(query, { id_object: object.id }, (err, rows) => {
 		if(err) {
-			console.error(err);
-			callback([])
+			logger.error(err)
+			callback(api.error(err))
 			return
 		}
 		for (row of rows) {
@@ -88,18 +76,61 @@ exports.getAll = (...args) => {
 
 		query = 'SELECT ' + fieldString + ' FROM ' + object.schema +  '.' + object.name + ' ' + object.alias  + ' ' + joinString
 		//query += object.schema.toUpperCase() === 'CONF' ? ' WHERE ' + object.alias + '.ID > 100' : ''
-		query += (params.id && !(params.id instanceof Function)) ?
-			(object.schema === 'CONF' ? ' AND ' : ' WHERE ') + ' ' + object.alias + '.ID = ' + params.id :
-			''
-		query += (params.page && !(params.page instanceof Function) ? ' LIMIT ' + params.page*20 + ' OFFSET ' + (params.page-1)*20 + ';': ';')
 
-		db.query(query, dataMap, (err, rows) => {
-			if(err) {
-				console.error(err);
-				callback([])
+		// GET ONE BY ID
+		query += (params.id && !(params.id instanceof Function)) ?
+			// (object.schema.toUpperCase() === 'CONF' ? ' AND ' : ' WHERE ') + ' ' + object.alias + '.ID = ' + params.id :
+			' WHERE ' + ' ' + object.alias + '.ID = ' + params.id :
+			''
+
+		// QUERY FILTERS
+		const filterParams = {}
+		if(params.filter && !(params.filter instanceof Function)) {
+			try {
+				const filters = JSON.parse(params.filter)
+				const filterFields = object.fields.filter(f => Object.keys(filters).indexOf(f.name) !== -1)
+				if(filterFields.length > 0) {
+					query += ((params.id && !(params.id instanceof Function)) ? ' AND ' : ' WHERE ')
+						+ filterFields.map((f, i) => {
+							filterParams[f.name + i] = filters[f.name]
+							return f.foreign ?
+								f.referencedObject + f.id + '.' + f.referencedField + ' = :' + f.name + i :
+								object.alias + '.' + f.name + ' = :' + f.name + i
+						}).join(' AND ')
+				}
+			}
+			catch(e) {
+				callback(api.error(e))
+				logger.error(e)
 				return
 			}
-			typeof callback === 'function' && callback(rows)
+		}
+
+		// SORT QUERY IF PARAMS.SORT EXISTS; - FOR DESC SORT
+		if(params.sort && !(params.sort instanceof Function)) {
+				const sortFields = params.sort.split(',')
+					.filter(f => object.fields.map(f => f.name).indexOf(f.charAt(0) === '-' ? f.slice(1, f.length) : f) !== -1)
+					.map(f => f.charAt(0) === '-' ? { name: f.slice(1, f.length), dir: 'DESC' } : { name: f, dir: 'ASC' })
+			if(sortFields.length > 0) {
+				query += ' ORDER BY ' + sortFields.map(f => object.alias + '.' + f.name + ' ' + f.dir).join(',')
+			}
+		}
+
+		// QUERY PAGINATION ; PAGE SIZE : DEFAULT 20 / MAX 100
+		const page = params.page && parseInt(params.page) || 1
+		const size = params.size && Math.min(parseInt(params.size), 100) || 20
+		query += ' LIMIT ' + size + ' OFFSET ' + ((page - 1) * size) + ';'
+
+		logger.debug(params)
+		logger.debug(query)
+
+		db.query(query, filterParams, dataMap, (err, rows) => {
+			if(err) {
+				console.error(err);
+				callback(api.error(err))
+				return
+			}
+			typeof callback === 'function' && callback(api.success(rows))
 		})
 	})
 }
@@ -111,23 +142,16 @@ exports.getCount = (object, callback) => {
 	})
 }
 
-exports.getGroups = (callback) => {
-	const query = 'SELECT ID AS id, NAME AS name FROM CONF.OBJECTGROUP WHERE VALID = 1 ORDER BY POS ASC;'
-	db.query(query, (rows) => {
-		typeof callback === 'function' && callback(rows)
-	})
-}
-
 exports.getUsedGroups = (prod, callback) => {
 	const query = 'SELECT DISTINCT CG.ID id, CG.NAME name, CG.POS pos, CG.VALID valid FROM CONF.OBJECT CO INNER JOIN CONF.OBJECTGROUP CG ON CG.ID = CO.PARENT_GROUP WHERE VALID = 1 ' + (prod ? 'AND ID >= 100' : '') + ' ORDER BY CG.POS ASC'
-	db.query(query, { id: Number, name: String, pos: Number, valid: Boolean }, (rows) => {
+	db.query(query, { id: Number, name: String, pos: Number, valid: Boolean }, rows => {
 		typeof callback === 'function' && callback(rows)
 	})
 }
 
 exports.getGroupObjects = (prod, callback) => {
 	const query = 'SELECT CG.ID AS groupId, CG.NAME groupName, CG.POS AS groupPos, CO.ID objectId, CO.NAME objectName, CO.LABEL AS objectLabel, CO.POS AS objectPos FROM CONF.OBJECT CO JOIN CONF.OBJECTGROUP CG ON CO.PARENT_GROUP = CG.ID ORDER BY CG.POS ASC;'
-	db.query(query, (rows) => {
+	db.query(query, rows => {
 		typeof callback === 'function' && callback(rows)
 	})
 }
@@ -440,7 +464,7 @@ exports.editField = (object, field, data, callback) => {
 					db.query(query);
 				}
 				db.query('COMMIT;');
-				updateViewObjects(() => {
+				getViewObjects(() => {
 					typeof callback === 'function' && callback({ msg: 'OK' });
 				});
 			}
@@ -610,56 +634,13 @@ exports.deleteUser = (id, callback) => {
 exports.activateUser = (id, callback) => {
 	var query = 'UPDATE CONF.USER SET ACTIVE = CASE WHEN ACTIVE = 0 THEN 1 ELSE 0 END WHERE ID = :id';
 	db.query(query, { id: id }, function (err, rows) {
-		err ? callback({msg: 'KO', detail: err}) : callback({ msg: 'OK' });
+		err ? callback({ msg: 'KO', detail: err }) : callback({ msg: 'OK' });
 	});
 }
 
 /** CONFIGURATION **/
 
-const SCHEMA_QUERY = "SELECT O.ID id, \
-				 S.NAME schema, \
-				 O.NAME name, \
-				 O.LABEL label, \
-				 O.ALIAS alias, \
-				 O.APIURL apiUrl, \
-				 O.VIEW_ID viewId, \
-				 O.ISDEFAULT \"default\", \
-				 O.ISACTIVABLE activable, \
-				 O.POS pos, \
-				 G.NAME \"group\", \
-				 G.ID groupId, \
-				 O.CUSTOM custom, \
-				 O.ISFORM \"isform\", \
-				 COALESCE(F.FIELDS, JSON_ARRAY() ) fields \
-FROM OBJECT O \
-INNER JOIN SCHEMA S ON O.SCHEMA = S.ID \
-LEFT JOIN ( \
-		SELECT PARENT_OBJECT, \
-						 JSON_GROUP_ARRAY(JSON_OBJECT('id', ID, 'name', NAME, 'label', LABEL, 'type', DATATYPE, \ 'generated', ISGENERATED, 'default', DATADEFAULT, 'foreign', ISFOREIGN, 'referencedObject', REFERENCED_OBJECT, 'referencedField', REFERENCED_FIELD, 'pos', POS, 'parentObject', PARENT_OBJECT, 'hidden', HIDDEN, 'required', REQUIRED) ) FIELDS \
-				FROM ( \
-						SELECT F.PARENT_OBJECT, \
-						 F.ID, \
-						 F.NAME, \
-						 F.LABEL, \
-						 DT.NAME AS DATATYPE, \
-						 F.ISGENERATED, \
-						 DD.NAME AS DATADEFAULT, \
-						 F.ISFOREIGN, \
-						 F.REFERENCED_OBJECT, \
-						 F.REFERENCED_FIELD, \
-						 F.POS, \
-						 F.HIDDEN, \
-						 F.REQUIRED \
-				FROM FIELD F \
-						 LEFT JOIN \
-						 DATATYPE DT ON F.DATATYPE = DT.ID \
-						 LEFT JOIN \
-						 DATADEFAULT DD ON F.DATADEFAULT = DD.ID \
-			 ORDER BY F.POS \
-		 ) FIELDS \
-			 GROUP BY PARENT_OBJECT \
-) F ON O.ID = F.PARENT_OBJECT \
-LEFT JOIN OBJECTGROUP G ON O.PARENT_GROUP = G.ID"
+const SCHEMA_QUERY = sql(require('path').join('sql', 'VIEW_OBJECTS.sql'))
 
 const SCHEMA_TYPES = {
 	id: Number,
@@ -690,8 +671,7 @@ const SCHEMA_TYPES = {
 	}
 }
 
-exports.updateViewObjects = function (params, callback) {
-
+exports.getViewObjects = function (params, callback) {
 	if (arguments.length === 1) {
 		if (params instanceof Function) {
 			callback = params;
@@ -708,8 +688,14 @@ exports.updateViewObjects = function (params, callback) {
 	query += ' ORDER BY O.POS;'
 
 	db.query(query,	params,	SCHEMA_TYPES,	(err, rows) => {
-			err && console.error(err)
-			typeof callback === 'function' && callback({msg: 'OK', obj: rows})
+			if(err) {
+				logger.error(err)
+				typeof callback === 'function' && callback(api.error(err))
+			}
+			else {
+				typeof callback === 'function' && callback(api.success(rows))
+			}
+
 	})
 }
 

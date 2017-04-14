@@ -258,6 +258,7 @@ const startServer = (configFile) => {
 	app.engine('mst', mustacheExpress())
 	app.set('views', 'views')
 	app.set('view engine', 'mst')
+	app.set('json spaces', 2)
 	// Http to https redirection
 	if (configFile.httpsPort !== 0) {
 		app.use(requireHttps(configFile.httpsPort));

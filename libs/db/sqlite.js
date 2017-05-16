@@ -1,3 +1,6 @@
+const _ = require('js-common-utils')
+const jwt = require('jsonwebtoken')
+
 const api = require('../../utils/api')
 const logger = require('../../utils/logging')
 const sql = require('../../utils/sql')
@@ -10,6 +13,13 @@ exports.openDb = (type, config) => {
 	return db
 }
 
+/** GET RESPONSES **/
+
+exports.getAll = async (object, params) => {
+	const { status, code, data } = await getAll(object, params)
+	return status ? api.success(data, code) : api.error(data, code)
+}
+
 /** GET QUERIES **/
 
 /**
@@ -18,19 +28,9 @@ exports.openDb = (type, config) => {
  * @param {object} params - Les critères de recherche {id, page, size, sort, filter, fields}
  * @param {function} callback
  */
+// /api/object?fields=field1,field2&sort=field1,-field2&page=1&size=100&filter={field1:"value",field2:"value"}
 const GET_ALL = sql(require('path').join('sql', 'GET_ALL.sql'))
-exports.getAll = (...args) => {
-	let [ object, params, callback ] = args
-
-	if(callback === undefined) {
-		if (params instanceof Function) {
-			callback = params
-		}
-		else {
-			throw 'Callback is not a function'
-		}
-	}
-
+const getAll = async (object, params) => {
 	let query = GET_ALL
 
 	// REQUESTED FIELDS
@@ -43,97 +43,275 @@ exports.getAll = (...args) => {
 
 	query += ' ORDER BY F.POS ASC;'
 
-	logger.debug(query)
-
 	let join = false
 	let fieldString = ''
 	let joinString = ''
 
-	db.query(query, { id_object: object.id }, (err, rows) => {
-		if(err) {
-			logger.error(err)
-			callback(api.error(err))
-			return
+	const rows = await new Promise((resolve, reject) => {
+		db.query(query, { id_object: object.id }, (err, rows) => {
+			if(err) {
+				reject({ status: false, code: 500, data: err })
+				logger.error(err)
+			}
+			else {
+				resolve(rows)
+			}
+		})
+	})
+
+	for (row of rows) {
+		if(row.join != '') {
+			join = true
+			break
 		}
-		for (row of rows) {
-			if(row.join != '') {
-				join = true
-				break
+	}
+	const dataMap = {}
+	for (row of rows) {
+		try {
+			dataMap[row.name] = eval(row.type)
+		}
+		catch(e) {
+			dataMap[row.name] = String
+		}
+		fieldString += row.field + ' AS ' + row.name + ','
+		joinString += row.join != '' ? '' + row.join + ' ' : ''
+	}
+	fieldString = _.removeLastChar(fieldString)
+
+	query = 'SELECT ' + fieldString + ' FROM ' + object.schema + '.' + object.name + ' ' + object.alias + ' ' + joinString
+
+	const filterParams = {}
+	// GET ONE BY ID
+	if(params.id) {
+		query += ' WHERE ' + object.alias + '.ID = :id'
+		filterParams.id = params.id
+	}
+
+	// QUERY FILTERS
+	if(params.filter) {
+		try {
+			const filters = JSON.parse(params.filter)
+			const filterFields = object.fields.filter(f => Object.keys(filters).indexOf(f.name) !== -1)
+			if(filterFields.length > 0) {
+				query += (params.id ? ' AND ' : ' WHERE ')
+					+ filterFields.map((f, i) => {
+						filterParams[f.name + i] = filters[f.name]
+						return f.foreign ?
+							f.referencedObject + f.id + '.' + f.referencedField + ' = :' + f.name + i :
+							object.alias + '.' + f.name + ' = :' + f.name + i
+					}).join(' AND ')
 			}
 		}
-		const dataMap = {}
-		for (row of rows) {
+		catch(e) {
+			logger.error(e)
+			return { status: false, code: 400, data: 'Filter parsing error.'}
+		}
+	}
+
+	// SORT QUERY IF PARAMS.SORT EXISTS; - FOR DESC SORT
+	if(params.sort && !(params.sort instanceof Function)) {
+			const sortFields = params.sort.split(',')
+				.filter(f => object.fields.map(f => f.name).indexOf(['-', '+'].indexOf(f.charAt(0)) !== -1 ? f.slice(1, f.length) : f) !== -1)
+				.map(f => f.charAt(0) === '-' ? { name: f.slice(1, f.length), dir: 'DESC' } : { name: f, dir: 'ASC' })
+		if(sortFields.length > 0) {
+			query += ' ORDER BY ' + sortFields.map(f => object.alias + '.' + f.name + ' ' + f.dir).join(',')
+		}
+	}
+
+	// QUERY PAGINATION ; PAGE SIZE : DEFAULT 20 / MAX 100
+	const page = params.page && parseInt(params.page) || 1
+	const size = params.size && Math.min(parseInt(params.size), 100) || 20
+	query += ' LIMIT ' + size + ' OFFSET ' + ((page - 1) * size) + ';'
+
+	try {
+		return await new Promise((resolve, reject) => {
+			db.query(query, filterParams, dataMap, (err, rows) => {
+				if(err) {
+					reject({ status: false, code: 500, data: err.message })
+					console.error(err, rows)
+				}
+				else if(rows.length === 0) {
+					reject({ status: false, code: 404, data: 'Specified resource does not exists' })
+				}
+				else {
+					resolve({ status: true, code: 200, data: rows })
+				}
+			})
+		})
+	}
+	catch(err) {
+		return err
+	}
+}
+
+/** PUT QUERIES **/
+
+exports.postCreate = async (object, params, callback) => {
+	if (arguments.length === 2) {
+		if (params instanceof Function) {
+			callback = params;
+		}
+		else {
+			throw 'Callback is not a function.';
+		}
+	}
+
+	let isParamsValid = true
+	let messages = []
+	let query = ''
+	let baseQuery = 'INSERT INTO ' + object.schema + '.' + object.name
+	let tableInfo = ' ('
+
+	for (field of object.fields.filter(f => f.name !== 'id')) {
+		/**
+		 * Test des paramètres
+		**/
+		// Required fields
+		if(params[field.name] === undefined) {
+			if(field.required) {
+				isParamsValid = false
+				messages.push(`Missing required parameter : ${field.name}`)
+				continue
+			}
+			continue
+		}
+		// Foreign fields
+		if(field.foreign) {
+			if(!parseInt(params[field.name])) {
+				isParamsValid = false
+				messages.push(`Foreign field ${field.name} requires numeric value not : ${params[field.name]}`)
+				continue
+			}
 			try {
-				dataMap[row.name] = eval(row.type)
-			}
-			catch(e) {
-				dataMap[row.name] = String
-			}
-			fieldString += row.field + ' AS ' + row.name + ','
-			joinString += row.join != '' ? '' + row.join + ' ' : ''
-		}
-		fieldString = __removeLastChar(fieldString)
-
-		query = 'SELECT ' + fieldString + ' FROM ' + object.schema +  '.' + object.name + ' ' + object.alias  + ' ' + joinString
-		//query += object.schema.toUpperCase() === 'CONF' ? ' WHERE ' + object.alias + '.ID > 100' : ''
-
-		// GET ONE BY ID
-		query += (params.id && !(params.id instanceof Function)) ?
-			// (object.schema.toUpperCase() === 'CONF' ? ' AND ' : ' WHERE ') + ' ' + object.alias + '.ID = ' + params.id :
-			' WHERE ' + ' ' + object.alias + '.ID = ' + params.id :
-			''
-
-		// QUERY FILTERS
-		const filterParams = {}
-		if(params.filter && !(params.filter instanceof Function)) {
-			try {
-				const filters = JSON.parse(params.filter)
-				const filterFields = object.fields.filter(f => Object.keys(filters).indexOf(f.name) !== -1)
-				if(filterFields.length > 0) {
-					query += ((params.id && !(params.id instanceof Function)) ? ' AND ' : ' WHERE ')
-						+ filterFields.map((f, i) => {
-							filterParams[f.name + i] = filters[f.name]
-							return f.foreign ?
-								f.referencedObject + f.id + '.' + f.referencedField + ' = :' + f.name + i :
-								object.alias + '.' + f.name + ' = :' + f.name + i
-						}).join(' AND ')
+				let foreignExists = await checkForeignField(params[field.name], field.referencedObject)
+				if(!foreignExists) {
+					isParamsValid = false
+					messages.push(`Value ${params[field.name]} does not exist for foreign field ${field.name}`)
+					continue
 				}
 			}
 			catch(e) {
-				callback(api.error(e))
-				logger.error(e)
-				return
+				console.log(e)
+				continue
 			}
 		}
-
-		// SORT QUERY IF PARAMS.SORT EXISTS; - FOR DESC SORT
-		if(params.sort && !(params.sort instanceof Function)) {
-				const sortFields = params.sort.split(',')
-					.filter(f => object.fields.map(f => f.name).indexOf(f.charAt(0) === '-' ? f.slice(1, f.length) : f) !== -1)
-					.map(f => f.charAt(0) === '-' ? { name: f.slice(1, f.length), dir: 'DESC' } : { name: f, dir: 'ASC' })
-			if(sortFields.length > 0) {
-				query += ' ORDER BY ' + sortFields.map(f => object.alias + '.' + f.name + ' ' + f.dir).join(',')
+		// Date fields
+		if(field.type === 'Date') {
+			if(isNaN(new Date(params[field.name]).getTime())) {
+				isParamsValid = false
+				messages.push(`Invalid format for date parameter ${field.name}. ISO8601 is prefered.`)
+				continue
+			}
+			else {
+				params[field.name] = new Date(params[field.name]).toISOString()
 			}
 		}
+		// Numeric field
+		if(field.type === 'Number' && (isNaN(parseFloat(params[field.name])) || isFinite(params[field.name]))) {
+			isParamsValid = false
+			messages.push(`Invalid format for numeric parameter ${field.name}`)
+			continue
+		}
 
-		// QUERY PAGINATION ; PAGE SIZE : DEFAULT 20 / MAX 100
-		const page = params.page && parseInt(params.page) || 1
-		const size = params.size && Math.min(parseInt(params.size), 100) || 20
-		query += ' LIMIT ' + size + ' OFFSET ' + ((page - 1) * size) + ';'
+		// Construction de la requête
+		tableInfo += field.name + ','
+		if(field.name === 'id') {
+			query +=  'null,'
+		}
+		else if (field.name === 'valid') {
+			query += '1,'
+		}
+		else if (field.type === 'Date') {
 
-		logger.debug(params)
-		logger.debug(query)
-
-		db.query(query, filterParams, dataMap, (err, rows) => {
-			if(err) {
-				console.error(err);
-				callback(api.error(err))
-				return
+			query += ':' + field.name + ','
+		}
+		else {
+			if (field.generated === true) {
+				params[field.name] = DD[field.default]()
 			}
-			typeof callback === 'function' && callback(api.success(rows))
+			query += ':' + field.name + ','
+		}
+	}
+
+	if(!isParamsValid) {
+		callback(api.error(messages, 400))
+		return
+	}
+
+	query = query.substring(0, query.length -1)
+	tableInfo = tableInfo.substring(0, tableInfo.length -1) + ')'
+	query = baseQuery + tableInfo + ' VALUES (' + query + ');'
+
+	db.query(query, params, async (err) => {
+		if (err) {
+			console.error(err)
+			typeof callback === 'function' && callback(api.error(err.message))
+		}
+		else {
+			try {
+				const { status, code, data } = await fetchLastInserted(object)
+				typeof callback === 'function' && callback(status ? api.success(data, code) : api.error(data, code))
+			}
+			catch(err) {
+				typeof callback === 'function' && callback(api.error(err.message))
+			}
+		}
+	})
+}
+
+/** DELETE QUERIES **/
+
+exports.postDelete = async (object, id) => {
+	const entry = await getAll(object, { id: id })
+	if (!entry.status) {
+		return api.error(entry.data, entry.code)
+	}
+	let query = 'DELETE FROM ' + object.schema + '.' + object.name + ' WHERE ID = :id'
+	try {
+		return await new Promise((resolve, reject) => {
+			db.once('error', err => reject(api.error(err, 500)))
+			db.query(query, { id: id }, _ => {
+				resolve(api.success({}))
+			})
+		})
+	}
+	catch(err) {
+		return err
+	}
+}
+
+/** HELPERS **/
+
+/** POST **/
+
+const checkForeignField = (id, objectName) => {
+	const query = 'SELECT COUNT(1) as "count" FROM ' + objectName + ' WHERE ID = :id';
+	return new Promise((resolve, reject) => {
+		db.query(query, { id: id }, { count: Number }, (err, rows) => {
+			if(!err && rows) {
+				// False if count = 0; True otherwise
+				resolve(rows[0].count !== 0)
+			}
+			else {
+				console.error(err)
+				reject(false)
+			}
 		})
 	})
 }
+
+const fetchLastInserted = (object) => {
+	return new Promise((resolve, reject) => {
+		db.lastRowID(object.name, id => {
+			resolve(getAll(object, { id: id }))
+		})
+	})
+}
+
+
+/**
+ *	OLD
+**/
 
 exports.getCount = (object, callback) => {
 	const query = 'SELECT COUNT(1) AS "count" FROM STORAGE.' + object.name + ';'
@@ -155,75 +333,13 @@ exports.getGroupObjects = (prod, callback) => {
 		typeof callback === 'function' && callback(rows)
 	})
 }
-/** POST QUERIES **/
 
-exports.postCreate = function(object, params, callback) {
-	console.log(object, params);
-	if (arguments.length == 2) {
-		if (params instanceof Function) {
-			callback = params;
-		}
-		else {
-			throw 'Callback is not a function.';
-		}
-	}
-
-	let query = ''
-	let baseQuery = 'INSERT INTO ' + object.schema + '.' + object.name
-	let tableInfo = ' ('
-
-	for (field of object.fields) {
-
-		tableInfo += field.name + ','
-		if(field.name === 'id') {
-			query +=  'null,'
-		}
-		else if (field.name === 'valid') {
-			query += '1,'
-		}
-		else if (field.type === 'Date') {
-			query += ':' + field.name + ','
-		}
-		else {
-			if (field.generated === true) {
-				params[field.name] = DD[field.default]()
-			}
-			query += ':' + field.name + ','
-		}
-	}
-
-	query = query.substring(0, query.length -1)
-	tableInfo = tableInfo.substring(0, tableInfo.length -1) + ')'
-	query = baseQuery + tableInfo + ' VALUES (' + query + ');'
-
-	db.query(query, params, (err, rows) => {
-		if (err) {
-			console.error(err)
-			typeof callback === 'function' && callback({msg: 'KO', err: err})
-		}
-		else {
-			typeof callback === 'function' && callback({msg: 'OK', obj: ''})
-		}
-	})
-}
 
 exports.postActivate = (object, id, callback) => {
 	let query = 'UPDATE STORAGE.' + object.name + ' SET VALID = CASE WHEN VALID = 0 THEN 1 ELSE 0 END WHERE ID = :id'
 	db.query(query, {id: id}, (err, rows) => {
 		if (!err) {
 			typeof callback === 'function' && callback({msg: 'OK', obj: 'Enregistrement activé'})
-		}
-		else {
-			typeof callback === 'function' && callback({msg: 'KO', obj: err})
-		}
-	})
-}
-
-exports.postDelete = (object, id, callback) => {
-	let query = 'DELETE FROM STORAGE.' + object.name + ' WHERE ID = :id'
-	db.query(query, {id: id}, (err, rows) => {
-		if (!err) {
-			typeof callback === 'function' && callback({msg: 'OK', obj: 'Enregistrement supprimé'})
 		}
 		else {
 			typeof callback === 'function' && callback({msg: 'KO', obj: err})
@@ -593,6 +709,10 @@ exports.editObjectOrder = (data, callback) => {
 	})
 }
 
+/** HELPERS **/
+
+/** POST HELPERS **/
+
 /** USERS **/
 
 exports.getAllUsers = (callback) => {
@@ -720,6 +840,34 @@ exports.authenticate = function (username, password, done) {
 			else {
 				return done(null, rows[0])
 			}
+	})
+}
+
+exports.authenticateJWT = (username, password, callback) => {
+	console.log(username, password);
+	if(username === undefined || password === undefined) {
+		callback(api.error('Bad request', 400))
+		return
+	}
+	const query = 'SELECT id, login, level FROM CONF.USER WHERE login = :user AND password = :pass'
+	db.query(query, { user: username, pass: password }, (err, rows) => {
+		if(err) {
+			callback(api.error('Internal error.'))
+			console.error(err)
+		}
+		else if (rows.length === 0) {
+			callback(api.error('Cannot authenticate user.', 401))
+		}
+		else if (rows[0].active === 0) {
+			callback(api.error('This account has been suspended. Please contact an administrator.', 401))
+		}
+		else {
+			callback(api.success({
+				token: jwt.sign({
+					exp: Math.floor(Date.now() / 1000) + (604800)
+				}, 'jsforms')
+			}))
+		}
 	})
 }
 

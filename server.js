@@ -196,35 +196,7 @@ const cluster = require('cluster')
 /** SERVER **/
 
 const main = _ => {
-	const configFile = loadConfigFile()
-
-	if(!configFile.devMode) {
-		process.on('uncaughtException', (err) => {
-		    console.error(err)
-		})
-	}
-
-	if (configFile.clusteringEnabled) {
-		if (cluster.isMaster) {
-			for(let i = 0; i < configFile.maxUsedCpus; i++) {
-				cluster.fork()
-			}
-
-			cluster.on('online', (worker) => {
-				console.log('Worker ' + worker.process.pid + ' is online.');
-			});
-
-			cluster.on('exit', (worker, code, signal) => {
-				cluster.fork()
-			});
-		}
-		else {
-			startServer(configFile)
-		}
-	}
-	else {
-		startServer(configFile)
-	}
+	startServer(loadConfigFile())
 }
 
 /** SERVER CONFIGURATION **/
@@ -299,6 +271,9 @@ const startServer = (configFile) => {
 
 	loadCustomRoutes(app, configFile)
 	app.use('/api', require('./routes/main'))
+	app.use((err, req, res, next) => {
+		res.status(err.status || 500).send({ status: 'error', message: err.message })
+	})
 	// require('./routes/main.js')({app: app, passport: passport, dblib: DbLib, conf: configFile, storage: releases})
 }
 
@@ -338,8 +313,8 @@ const validateConfigFile = _ => {
 
 // Custom functions and routes definition
 const loadCustomRoutes = (app, configFile) => {
-	configFile.customRoutes.forEach((route) => {
-		require('./routes/custom/' + route)(app)
+	configFile.customRoutes.forEach(route => {
+		app.use('/api/' + route, require('path').join(__dirname, 'routes', 'custom', route))
 	})
 }
 
@@ -350,7 +325,6 @@ const requireHttps = (httpsPort) => {
 			return res.redirect('https://' + req.headers.host.split(':')[0] + ':' + httpsPort + req.url)
 		}
 		else {
-			console.log('next')
 			next()
 		}
 	}

@@ -1,15 +1,21 @@
 /** API RESPONSE WRAPPER **/
 
-exports.success = (data) => {
+exports.success = (data, code = 200) => {
   return {
-    status: 'success',
-    data: data
+    code: code,
+    data: {
+      status: 'success',
+      data: data
+    }
   }
 }
 
-exports.error = (data) => {
+exports.error = (data, code = 500) => {
   return {
-    status: 'error',
-    message: data
+    code: code,
+    data: {
+      status: 'error',
+      message: data
+    }
   }
 }

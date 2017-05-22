@@ -23,7 +23,7 @@ FROM
       (
          SELECT
             PARENT_OBJECT,
-            JSON_GROUP_ARRAY(JSON_OBJECT('id', ID, 'name', NAME, 'label', LABEL, 'type', DATATYPE, 'generated', ISGENERATED, 'default', DATADEFAULT, 'foreign', ISFOREIGN, 'referencedObject', REFERENCED_OBJECT, 'referencedField', REFERENCED_FIELD, 'pos', POS, 'parentObject', PARENT_OBJECT, 'hidden', HIDDEN, 'required', REQUIRED) ) FIELDS
+            JSON_GROUP_ARRAY(JSON_OBJECT('id', ID, 'name', NAME, 'label', LABEL, 'type', DATATYPE, 'generated', ISGENERATED, 'default', DATADEFAULT, 'foreign', ISFOREIGN, 'referencedObject', REFERENCED_OBJECT, 'referencedField', REFERENCED_FIELD, 'pos', POS, 'parentObject', PARENT_OBJECT, 'hidden', HIDDEN, 'required', REQUIRED, 'isunique', ISUNIQUE) ) FIELDS
          FROM
             (
                SELECT
@@ -41,7 +41,8 @@ FROM
                   RF.NAME REFERENCED_FIELD,
                   F.POS,
                   F.HIDDEN,
-                  F.REQUIRED
+                  F.REQUIRED,
+                  F.ISUNIQUE
                FROM
                   FIELD F
                   LEFT JOIN

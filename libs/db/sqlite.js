@@ -13,10 +13,25 @@ exports.openDb = (type, config) => {
 	return db
 }
 
-/** GET RESPONSES **/
+/** RESPONSES **/
 
 exports.getAll = async (object, params) => {
 	const { status, code, data } = await getAll(object, params)
+	return status ? api.success(data, code) : api.error(data, code)
+}
+
+exports.postCreate = async (object, params) => {
+	const { status, code, data } = await postCreate(object, params)
+	return status ? api.success(data, code) : api.error(data, code)
+}
+
+exports.postDelete = async (object, id) => {
+	const { status, code, data } = await postDelete(object, id)
+	return status ? api.success(data, code) : api.error(data, code)
+}
+
+exports.postUpdate = async (object, id, params) => {
+	const { status, code, data } = await postUpdate(object, id, params)
 	return status ? api.success(data, code) : api.error(data, code)
 }
 
@@ -144,18 +159,9 @@ const getAll = async (object, params) => {
 	}
 }
 
-/** PUT QUERIES **/
+/** POST QUERIES **/
 
-exports.postCreate = async (object, params, callback) => {
-	if (arguments.length === 2) {
-		if (params instanceof Function) {
-			callback = params;
-		}
-		else {
-			throw 'Callback is not a function.';
-		}
-	}
-
+const postCreate = async (object, params, callback) => {
 	let isParamsValid = true
 	let messages = []
 	let query = ''
@@ -175,6 +181,14 @@ exports.postCreate = async (object, params, callback) => {
 			}
 			continue
 		}
+		// Unique fields
+		if(field.isunique) {
+			if(!await checkUniqueField(params[field.name], object, field)) {
+				isParamsValid = false
+				messages.push(`A record with value "${params[field.name]}" already exists for unique field ${field.name}`)
+				continue
+			}
+		}
 		// Foreign fields
 		if(field.foreign) {
 			if(!parseInt(params[field.name])) {
@@ -183,8 +197,7 @@ exports.postCreate = async (object, params, callback) => {
 				continue
 			}
 			try {
-				let foreignExists = await checkForeignField(params[field.name], field.referencedObject)
-				if(!foreignExists) {
+				if(!await checkForeignField(params[field.name], field.referencedObject)) {
 					isParamsValid = false
 					messages.push(`Value ${params[field.name]} does not exist for foreign field ${field.name}`)
 					continue
@@ -234,44 +247,147 @@ exports.postCreate = async (object, params, callback) => {
 	}
 
 	if(!isParamsValid) {
-		callback(api.error(messages, 400))
-		return
+		return { status: false, code: 400, data: messages }
 	}
 
 	query = query.substring(0, query.length -1)
 	tableInfo = tableInfo.substring(0, tableInfo.length -1) + ')'
 	query = baseQuery + tableInfo + ' VALUES (' + query + ');'
 
-	db.query(query, params, async (err) => {
-		if (err) {
-			console.error(err)
-			typeof callback === 'function' && callback(api.error(err.message))
-		}
-		else {
-			try {
-				const { status, code, data } = await fetchLastInserted(object)
-				typeof callback === 'function' && callback(status ? api.success(data, code) : api.error(data, code))
-			}
-			catch(err) {
-				typeof callback === 'function' && callback(api.error(err.message))
-			}
-		}
-	})
+	try {
+		return new Promise((resolve, reject) => {
+			db.query(query, params, async err => {
+				if (err) {
+					reject({ status: false, code: 500, data: err })
+					console.error(err)
+				}
+				else {
+					try {
+						const record = await fetchLastInserted(object)
+
+						resolve(record)
+					}
+					catch (err) {
+						reject(err)
+					}
+				}
+			})
+		})
+	}
+	catch (err) {
+		return err
+	}
+
 }
 
 /** DELETE QUERIES **/
 
-exports.postDelete = async (object, id) => {
+const postDelete = async (object, id) => {
 	const entry = await getAll(object, { id: id })
 	if (!entry.status) {
-		return api.error(entry.data, entry.code)
+		return entry
 	}
 	let query = 'DELETE FROM ' + object.schema + '.' + object.name + ' WHERE ID = :id'
 	try {
 		return await new Promise((resolve, reject) => {
-			db.once('error', err => reject(api.error(err, 500)))
+			db.once('error', err => reject({ status: false, code: 500, data: err }))
 			db.query(query, { id: id }, _ => {
-				resolve(api.success({}))
+				resolve({ status: true, code: 200, data: {} })
+			})
+		})
+	}
+	catch(err) {
+		return err
+	}
+}
+
+/** PUT QUERIES **/
+
+const postUpdate = async (object, id, params, callback) => {
+	// Check if requested id exists
+	const entry = await getAll(object, { id: id })
+	if(!entry.status)
+		return entry
+
+	let query = 'UPDATE ' + object.schema + '.' + object.name + ' SET '
+	let isParamsValid = true
+	let messages = []
+
+	for (field of object.fields.filter(f => f.name !== 'id')) {
+		/**
+		 * Parameter check
+		**/
+		// Not provided fields
+		if(params[field.name] === undefined)
+			continue
+		// Required fields
+		if(field.required && params[field.name] === null) {
+			isParamsValid = false
+			messages.push(`Required parameter ${field.name} cannot be null.`)
+			continue
+		}
+		// Unique fields
+		if(field.isunique) {
+			if(!await checkUniqueField(params[field.name], object, field)) {
+				isParamsValid = false
+				messages.push(`A record with value "${params[field.name]}" already exists for field ${field.name}`)
+				continue
+			}
+		}
+		// Foreign fields
+		if(field.foreign) {
+			if(params[field.name] !== null && !parseInt(params[field.name])) {
+				isParamsValid = false
+				messages.push(`Foreign field ${field.name} requires numeric value not : ${params[field.name]}`)
+				continue
+			}
+			try {
+				let foreignExists = await checkForeignField(params[field.name], field.referencedObject)
+				if(!foreignExists) {
+					isParamsValid = false
+					messages.push(`Value ${params[field.name]} does not exist for foreign field ${field.name}`)
+					continue
+				}
+			}
+			catch(e) {
+				console.log(e)
+				continue
+			}
+		}
+		// Date fields
+		if(field.type === 'Date') {
+			if(isNaN(new Date(params[field.name]).getTime())) {
+				isParamsValid = false
+				messages.push(`Invalid format for date parameter ${field.name}. ISO8601 is prefered.`)
+				continue
+			}
+			else {
+				params[field.name] = new Date(params[field.name]).toISOString()
+			}
+		}
+		// Numeric field
+		if(field.type === 'Number' && (isNaN(parseFloat(params[field.name])) || isFinite(params[field.name]))) {
+			isParamsValid = false
+			messages.push(`Invalid format for numeric parameter ${field.name}`)
+			continue
+		}
+
+		// Construction de la requête
+		query += field.name + ' = :' + field.name + ','
+	}
+
+	if(!isParamsValid) {
+		return { status: false, code: 400, data: messages }
+	}
+
+	query = query.substring(0, query.length - 1) + ' WHERE ID = :id;'
+	params.id = id
+
+	try {
+		return new Promise((resolve, reject) => {
+			db.once('error', err => reject({ status: false, code: 500, data: err }))
+			db.query(query, params, async _ => {
+				resolve(await getAll(object, { id: id }))
 			})
 		})
 	}
@@ -282,7 +398,20 @@ exports.postDelete = async (object, id) => {
 
 /** HELPERS **/
 
-/** POST **/
+const checkUniqueField = (value, object, field) => {
+	const query = 'SELECT COUNT(1) AS "count" FROM ' + object.schema + '.' + object.name + ' WHERE ' + field.name + ' = :value'
+	return new Promise((resolve, reject) => {
+		db.query(query, { value: value }, { count: Number }, (err, rows) => {
+			if(!err && rows) {
+				resolve(rows[0].count === 0)
+			}
+			else {
+				reject(false)
+				console.error(err)
+			}
+		})
+	})
+}
 
 const checkForeignField = (id, objectName) => {
 	const query = 'SELECT COUNT(1) as "count" FROM ' + objectName + ' WHERE ID = :id';
@@ -293,8 +422,8 @@ const checkForeignField = (id, objectName) => {
 				resolve(rows[0].count !== 0)
 			}
 			else {
-				console.error(err)
 				reject(false)
+				console.error(err)
 			}
 		})
 	})
@@ -308,6 +437,135 @@ const fetchLastInserted = (object) => {
 	})
 }
 
+/** CONFIGURATION TABLES **/
+
+const createObject = async (object, params) => {
+	if(!await insertIdField(object))
+		return { status: false, code: 500, data: `Unable to create id field in table ${object.name}`}
+
+	const query = 'CREATE TABLE :schema.:name (id INTEGER PRIMARY KEY)'
+	return new Promise(function(resolve, reject) {
+		db.once('error', err => {
+			db.query("DELETE FROM CONF.FIELD WHERE NAME = 'id' AND PARENT_OBJECT = :parentObject", { parentObject: object.id })
+			reject(false)
+		})
+		db.query(query, { schema: object.schema, name: object.name }, _ => {
+			resolve(true)
+		})
+	})
+}
+
+const createField = async (field) => {
+	const query = 'SELECT O.SCHEMA as "schema", O.NAME as "object", F.NAME as "field", DT.DEFINITION as "datatype", DD.DEFINITION as "definition" FROM CONF.FIELD F INNER JOIN CONF.OBJECT O ON O.ID = F.PARENT_OBJECT INNER JOIN CONF.DATATYPE DT ON F.DATATYPE = DT.ID LEFT JOIN CONF.DATADEFAULT DD ON F.DATADEFAULT = DT.ID WHERE F.ID = :id'
+
+	try {
+		const record = await new Promise(function(resolve, reject) {
+			db.query(query, { id: id }, (err, rows) => {
+				if(!err && rows.length === 1) {
+					resolve(rows[0])
+				}
+				else {
+					reject(null)
+				}
+			})
+		})
+		const query = 'ALTER TABLE ' + record.schema + '.' + record.object + ' ADD COLUMN ' + record.field + ' ' + record.datatype
+		return await new Promise(function(resolve, reject) {
+			db.once('error', err => reject(false))
+			db.query(query, _ => resolve(true))
+		})
+
+	}
+	catch(e) {
+		return false
+	}
+}
+
+const updateObject = (originalObject, updatedObject) => {
+	if(originalObject.name !== updatedObject.name || originalObject.schema !== updateObject.schema) {
+		const nameString  = object.fields.filter(f => f.name !== 'id').map(f => f.name).push('id').join(',')
+		const fieldString = object.fields.filter(f => f.name !== 'id').map(f => f.name + ' ' + f.datatype).push('id INTEGER PRIMARY KEY').join(',')
+		let query = 'CREATE TABLE ' + updatedObject.schema + '.' + updatedObject.name + ' (' + fieldString + ')'
+		query = 'INSERT INTO ' + objupdatedObjectect.schema + '.' + updatedObject.name + ' SELECT ' + nameString + ' FROM ' + originalObject.schema + '.' + originalObject.name
+		query = 'DROP TABLE ' + originalObject.schema + '.' + originalObject.name
+	}
+	else {
+		return true
+	}
+}
+
+const updateField = async (originalField, updatedField) => {
+	const originalObject = await getViewObject(originalField.parentObject)
+	const updatedObject = await getViewObject(updatedField.parentObject)
+	if(originalField.parentObject !== updatedField.parentObject) {
+		// ADD FIELD TO NEW TABLE
+		// TRANSFER DATA
+		// REMOVE FIELD FROM OLD TABLE
+		const datatype = await getAll(updateField.datatype).data
+		let queries = [
+			'ALTER TABLE ' + [updatedObject.schema, updatedObject.name].join('.') + ' ADD COLUMN ' + [updatedField.name, datatype.definition].join(' '),
+			'ALTER TABLE ' + [originalObject.schema, originalObject.name].join('.') + ' RENAME TO ' + [originalObject.schema, originalObject.name].join('.') + '_old',
+			''
+
+		]
+	}
+	else {
+		if(originalField.name !== updatedField.name || originalField.datatype !== updatedField.datatype || originalField.datadefault !== updatedField.datadefault) {
+			// RECREATE FIELD
+			let queries = [
+				'ALTER TABLE ' + [updatedObject.schema, updatedObject.name].join('.') + ' RENAME TO ' + [updatedObject.schema, updatedObject.name].join('.') + '_old',
+
+			]
+		}
+	}
+	if(originalField.isforeign !== updatedField.isforeign && originalField.referencedField !== updatedField.referencedField && originalField.referencedObject !== updatedField.referencedObject) {
+		// WIPE DATA
+	}
+	if(originalField.isunique === 0 && updatedField.isunique === 1) {
+		// CHECK IF VALUES ARE UNIQUE
+		// WIPE OTHERWISE
+	}
+	return true
+}
+
+const deleteObject = (object) => {
+	let query = 'DELETE FROM CONF.FIELD WHERE PARENT_OBJECT = :id'
+	query = 'DROP TABLE ' + object.schema + '.' + object.name
+}
+
+const deleteField = (object, fieldId) => {
+	let query = 'ALTER TABLE ' + object.schema + '.' + object.name + ' RENAME TO ' + object.schema + '.' + object.name + '_old'
+	const nameString  = object.fields.filter(f => f.id !== fieldId && f.name !== 'id').map(f => f.name).push('id').join(',')
+	const fieldString = object.fields.filter(f => f.id !== fieldId && f.name !== 'id').map(f => f.name + ' ' + f.datatype).push('id INTEGER PRIMARY KEY').join(',')
+	query = 'CREATE TABLE ' + object.schema + '.' + object.name + ' (' + fieldString + ')'
+	query = 'INSERT INTO ' + object.schema + '.' + object.name + ' SELECT ' + nameString + ' FROM ' + object.schema + '.' + object.name + '_old';
+	query = 'DROP TABLE ' + object.schema + '.' + object.name + '_old'
+}
+
+
+/** HELPERS **/
+
+const insertIdField = (object) => {
+	const query = 'INSERT INTO CONF.FIELD (name, label, datatype, isgenerated, isforeign, pos, parent_object, hidden, required, isunique) VALUES (:name, :label, :datatype, :isgenerated, :isforeign, :pos, :parentObject, :hidden, :required, :isunique)'
+	const params = {
+		name: 'id',
+		label: 'id_' + object.name,
+		datatype: 2,
+		isgenerated: 0,
+		isforeign: 0,
+		pos: 0,
+		parentObject: object.id,
+		hidden: 1,
+		required: 1,
+		isunique: 1
+	}
+	return new Promise((resolve, reject) => {
+		db.once('error', err => reject(false))
+		db.query(query, params, _ => {
+			resolve(true)
+		})
+	})
+}
 
 /**
  *	OLD
@@ -331,36 +589,6 @@ exports.getGroupObjects = (prod, callback) => {
 	const query = 'SELECT CG.ID AS groupId, CG.NAME groupName, CG.POS AS groupPos, CO.ID objectId, CO.NAME objectName, CO.LABEL AS objectLabel, CO.POS AS objectPos FROM CONF.OBJECT CO JOIN CONF.OBJECTGROUP CG ON CO.PARENT_GROUP = CG.ID ORDER BY CG.POS ASC;'
 	db.query(query, rows => {
 		typeof callback === 'function' && callback(rows)
-	})
-}
-
-
-exports.postActivate = (object, id, callback) => {
-	let query = 'UPDATE STORAGE.' + object.name + ' SET VALID = CASE WHEN VALID = 0 THEN 1 ELSE 0 END WHERE ID = :id'
-	db.query(query, {id: id}, (err, rows) => {
-		if (!err) {
-			typeof callback === 'function' && callback({msg: 'OK', obj: 'Enregistrement activé'})
-		}
-		else {
-			typeof callback === 'function' && callback({msg: 'KO', obj: err})
-		}
-	})
-}
-
-exports.postModify = (object, id, params, callback) => {
-
-	let fields = object.fields
-	let query = 'UPDATE STORAGE.' + object.name + ' SET '
-
-	for (field of fields) {
-		query += field.name + ' = :' + field.name + ','
-	}
-
-	query = query.substring(0, query.length - 1) + ' WHERE ID = :id;'
-	params.id = id
-
-	db.query(query, params, (err, rows) => {
-		typeof callback === 'function' && callback({msg: 'OK', obj: []})
 	})
 }
 
@@ -662,8 +890,8 @@ exports.removeField = (object, field, callback) => {
 							fieldString += rows[i].name + ' ' + rows[i].field + ',';
 							nameString += rows[i].name + ',';
 						}
-						fieldString = __removeLastChar(fieldString);
-						nameString = __removeLastChar(nameString);
+						fieldString = removeLastChar(fieldString);
+						nameString = removeLastChar(nameString);
 
 						query = 'ALTER TABLE STORAGE.' + object  + ' RENAME TO ' + object + '_old;';
 						query += 'CREATE TABLE STORAGE.' + object + '(' + fieldString + ');';
@@ -709,10 +937,6 @@ exports.editObjectOrder = (data, callback) => {
 	})
 }
 
-/** HELPERS **/
-
-/** POST HELPERS **/
-
 /** USERS **/
 
 exports.getAllUsers = (callback) => {
@@ -732,7 +956,7 @@ exports.createUser = (data, callback) => {
 			})
 		}
 		else {
-			typeof callback === 'function' && callback({ msg: 'KO', detail: {unique: 0 }})
+			typeof callback === 'function' && callback({ msg: 'KO', detail: { unique: 0 } })
 		}
 	})
 }
@@ -781,7 +1005,7 @@ const SCHEMA_TYPES = {
 	isform: Boolean,
 	fields: (fieldValue) => {
 		return JSON.parse(fieldValue, (key, value) => {
-			if(['generated', 'foreign', 'hidden', 'required'].indexOf(key) !== -1) {
+			if(['generated', 'foreign', 'hidden', 'required', 'isunique'].indexOf(key) !== -1) {
 				return Boolean(value)
 			}
 			else {
@@ -819,6 +1043,25 @@ exports.getViewObjects = function (params, callback) {
 	})
 }
 
+const getViewObject = async (id) => {
+	try {
+		const query = SCHEMA_QUERY + ' WHERE O.ID = :id'
+		return await new Promise((resolve, reject) => {
+			db.query(query, { id: id }, (err, rows) => {
+				if(!err && rows.length === 1) {
+					resolve(rows[0])
+				}
+				else {
+					reject({})
+				}
+			})
+		})
+	}
+	catch(e) {
+
+	}
+}
+
 exports.isValidRoute = (apiUrl, callback) => {
 	const query = SCHEMA_QUERY + ' WHERE apiUrl = :apiUrl'
 	db.query(query, { apiUrl: '/' + apiUrl },	SCHEMA_TYPES,	(err, rows) => {
@@ -844,7 +1087,6 @@ exports.authenticate = function (username, password, done) {
 }
 
 exports.authenticateJWT = (username, password, callback) => {
-	console.log(username, password);
 	if(username === undefined || password === undefined) {
 		callback(api.error('Bad request', 400))
 		return
@@ -880,7 +1122,7 @@ exports.deserializeUser = function (id, done) {
 
 /** UTILS **/
 
-const __removeLastChar = (string) => {
+const removeLastChar = (string) => {
 	return string.substring(0, string.length - 1)
 }
 

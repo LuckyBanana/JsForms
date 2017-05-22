@@ -17,8 +17,16 @@ const auth = jwt({ secret: 'jsforms' })
 const isValidRoute = (req, res, next) => {
 	DbLib.isValidRoute(req.params.apiUrl, object => {
 		if(object !== undefined) {
-			req.object = object
-			next()
+			if(object.schema.toUpperCase() === 'CONF' && object.name.toUpperCase() === 'SCHEMA' && req.method.toUpperCase() !== 'GET') {
+				res.status(400).send(`This operation isn't permitted on schema object`)
+			}
+			else if(object.schema.toUpperCase() === 'CONF' && object.name.toUpperCase() === 'DATATYPE' && ['GET', 'POST'].indexOf(req.method.toUpperCase()) === -1) {
+				res.status(400).send(`This operation isn't permitted on datatype object`)
+			}
+			else {
+				req.object = object
+				next()
+			}
 		}
 		else {
 			res.status(404).send(api.error('Requested object does not exist.'))
@@ -28,7 +36,7 @@ const isValidRoute = (req, res, next) => {
 
 // MIDDLEWARE CHECKING IF REQUESTED ID IS NUMERIC
 const parseId = (req, res, next) => {
-	if(['POST', 'DELETE'].indexOf(req.method.toUpperCase()) !== -1 && req.params.id === undefined) {
+	if(['PUT', 'DELETE'].indexOf(req.method.toUpperCase()) !== -1 && req.params.id === undefined) {
 		res.status(400).send(api.error(`${req.method} method requires an object to modify.`).data)
 	}
 	else if(req.params.id !== undefined && !parseInt(req.params.id)) {
@@ -57,18 +65,18 @@ router.get('/init/:id?', parseId, (req, res) => {
 router.route('/:apiUrl/:id?')
 	.get(auth, isValidRoute, parseId, async (req, res) => {
 		const params = req.query || {}
-		params.id = req.params.id
+		if(params.id !== undefined)
+			params.id = req.params.id
 		const { code, data } = await DbLib.getAll(req.object, params)
 		res.status(code).send(data)
 	})
-	.put(auth, isValidRoute, (req, res) => {
-		DbLib.postCreate(req.object, req.body, rst => {
-			const { code, data } = rst
-			res.status(code).send(data)
-		})
+	.post(auth, isValidRoute, async (req, res) => {
+		const { code, data } = await DbLib.postCreate(req.object, req.body)
+		res.status(code).send(data)
 	})
-	.post(auth, isValidRoute, parseId, (req, res) => {
-		res.send(api.success('TEST'))
+	.put(auth, isValidRoute, parseId, async (req, res) => {
+		const { code, data } = await DbLib.postUpdate(req.object, req.params.id, req.body)
+		res.status(code).send(data)
 	})
 	.delete(auth, isValidRoute, parseId, async (req, res) => {
 		const { code, data } = await DbLib.postDelete(req.object, req.params.id)

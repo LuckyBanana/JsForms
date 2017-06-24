@@ -56,7 +56,7 @@
  *	>
  *	> File upload générique
  *	>
- *	> 
+ *	>
  *	>
  *	> Patchs pour les bases de données > Nouveaux champs, .. > Faciliter les montées de version
  *	>	>> Parent Group et Custom (__OBJECT) + Config de base dans une db
@@ -192,41 +192,11 @@ const compress = require('compression')
 const config = require('config')
 const https = require('https')
 const cluster = require('cluster')
-const jwt = require('express-jwt')
-
 
 /** SERVER **/
 
 const main = _ => {
-	const configFile = loadConfigFile()
-
-	if(!configFile.devMode) {
-		process.on('uncaughtException', (err) => {
-		    console.error(err)
-		})
-	}
-
-	if (configFile.clusteringEnabled) {
-		if (cluster.isMaster) {
-			for(let i = 0; i < configFile.maxUsedCpus; i++) {
-				cluster.fork()
-			}
-
-			cluster.on('online', (worker) => {
-				console.log('Worker ' + worker.process.pid + ' is online.');
-			});
-
-			cluster.on('exit', (worker, code, signal) => {
-				cluster.fork()
-			});
-		}
-		else {
-			startServer(configFile)
-		}
-	}
-	else {
-		startServer(configFile)
-	}
+	startServer(loadConfigFile())
 }
 
 /** SERVER CONFIGURATION **/
@@ -236,7 +206,7 @@ const startServer = (configFile) => {
 	const releases = multer({dest: __dirname + '/uploads/releases'})
 
 	const DbLib = require(configFile.databaseLib)
-	const auth = jwt({ secret: 'jsforms' })
+
 
 	DbLib.openDb(configFile.databaseSystem, config)
 	app.use(helmet())
@@ -249,10 +219,18 @@ const startServer = (configFile) => {
 	app.use(flash())
 	app.use(passport.initialize())
 	app.use(passport.session())
+	app.use((req, res, next) => {
+	    res.setHeader('Access-Control-Allow-Origin', configFile.allowedRemoteHosts.join(' '))
+	    res.setHeader('Access-Control-Allow-Methods', configFile.allowedRemoteMethods.join(', '))
+	    res.setHeader('Access-Control-Allow-Headers', 'X-Requested-With,content-type')
+	    res.setHeader('Access-Control-Allow-Credentials', true)
+    	next()
+	})
 
 	app.engine('mst', mustacheExpress())
 	app.set('views', 'views')
 	app.set('view engine', 'mst')
+	app.set('json spaces', 2)
 	// Http to https redirection
 	if (configFile.httpsPort !== 0) {
 		app.use(requireHttps(configFile.httpsPort));
@@ -292,7 +270,23 @@ const startServer = (configFile) => {
 	/** ROUTES **/
 
 	loadCustomRoutes(app, configFile)
-	require('./routes/main.js')({app: app, passport: passport, auth: auth, dblib: DbLib, conf: configFile, storage: releases})
+	app.use('/api', require('./routes/main'))
+	app.use((err, req, res, next) => {
+		res.status(err.status || 500).send({ status: 'error', message: err.message })
+	})
+	if (app.get('env') === 'development') {
+  app.use((err, req, res, next) => {
+    const { code, data } = api.error({ message: err.message, error: err }, err.status || 500)
+    res.status(code).send(data)
+  })
+}
+
+app.use((err, req, res, next) => {
+  const { code, data } = api.error(err.message, err.status || 500)
+  res.status(code).send(data)
+})
+
+	// require('./routes/main.js')({app: app, passport: passport, dblib: DbLib, conf: configFile, storage: releases})
 }
 
 const loadConfigFile = _ => {
@@ -325,10 +319,14 @@ const loadConfigFile = _ => {
 	return configFile
 }
 
+const validateConfigFile = _ => {
+
+}
+
 // Custom functions and routes definition
 const loadCustomRoutes = (app, configFile) => {
-	configFile.customRoutes.forEach((route) => {
-		require('./routes/custom/' + route)(app)
+	configFile.customRoutes.forEach(route => {
+		app.use('/api/' + route, require('path').join(__dirname, 'routes', 'custom', route))
 	})
 }
 
@@ -339,7 +337,6 @@ const requireHttps = (httpsPort) => {
 			return res.redirect('https://' + req.headers.host.split(':')[0] + ':' + httpsPort + req.url)
 		}
 		else {
-			console.log('next')
 			next()
 		}
 	}

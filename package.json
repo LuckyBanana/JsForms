@@ -2,7 +2,7 @@
   "name": "js-forms",
   "version": "1.0.0",
   "description": "JsForms",
-  "main": "cluster.js",
+  "main": "server.js",
   "author": "DV",
   "license": "ISC",
   "repository": "bitbucket:LuckyBanana/jsforms",
@@ -26,7 +26,6 @@
     "express-jwt": "^5.1.0",
     "express-session": "~1.15.1",
     "express-useragent": "^1.0.7",
-    "finalhandler": "1.0.0",
     "fixed-data-table": "^0.6.3",
     "helmet": "^3.5.0",
     "js-common-utils": "https://mvaret@bitbucket.org/mvaret/js-common-utils.git",
@@ -37,7 +36,6 @@
     "passport": "~0.3.2",
     "passport-auth0": "^0.6.0",
     "passport-local": "~1.0.0",
-    "pg-minify": "^0.4.2",
     "winston": "^2.3.1"
   },
   "devDependencies": {

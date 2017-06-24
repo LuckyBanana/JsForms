@@ -49,6 +49,12 @@ const parseId = (req, res, next) => {
 
 /** API **/
 
+// router.get(/\/([a-z]+)\/?([0-9]+?)/ig, (req, res) => {
+// router.get(/^\/([a-z]+)\/?([0-9]+)?\/?([a-z]+)?(?:\/(?=$))?$/ig, (req, res) => {
+router.get('/:obj[a-z]+', (req, res) => {
+	res.send(req.params)
+})
+
 router.post('/authenticate', (req, res) => {
 	DbLib.authenticateJWT(req.body.username, req.body.password, rst => {
 		const { code, data } = rst

@@ -74,31 +74,39 @@ const getAll = async (object, params) => {
 		})
 	})
 
-	for (row of rows) {
-		if(row.join != '') {
-			join = true
-			break
-		}
-	}
-	const dataMap = {}
-	for (row of rows) {
-		try {
-			dataMap[row.name] = eval(row.type)
-		}
-		catch(e) {
-			dataMap[row.name] = String
-		}
-		fieldString += row.field + ' AS ' + row.name + ','
-		joinString += row.join != '' ? '' + row.join + ' ' : ''
-	}
-	fieldString = _.removeLastChar(fieldString)
+	join = rows.filter(row => row !== '').length > 0
+	// for (row of rows) {
+	// 	if(row.join != '') {
+	// 		join = true
+	// 		break
+	// 	}
+	// }
+	// const dataMap = {}
+	fieldString = rows.map(row => `${row.field} AS ${row.name}`).join(',')
+	joinString = rows.filter(row => row.join !== '').map(row => `${row.join}`).join(' ')
+	const dataMap = rows.reduce((acc, row) => { acc[row.name] = eval(row.type); return acc; }, {})
+
+
+	// for (row of rows) {
+	// 	try {
+	// 		dataMap[row.name] = eval(row.type)
+	// 	}
+	// 	catch(e) {
+	// 		dataMap[row.name] = String
+	// 	}
+	// 	fieldString += row.field + ' AS ' + row.name + ','
+	// 	joinString += row.join != '' ? '' + row.join + ' ' : ''
+	// }
+	// fieldString = _.removeLastChar(fieldString)
 
 	query = 'SELECT ' + fieldString + ' FROM ' + object.schema + '.' + object.name + ' ' + object.alias + ' ' + joinString
+	query = `SELECT ${fieldString} FROM ${object.schema}.${object.name} ${object.alias} ${joinString}`
 
 	const filterParams = {}
 	// GET ONE BY ID
 	if(params.id) {
-		query += ' WHERE ' + object.alias + '.ID = :id'
+		// query += ' WHERE ' + object.alias + '.ID = :id'
+		query += ` WHERE ${object.alias}.ID = :id`
 		filterParams.id = params.id
 	}
 
@@ -165,7 +173,8 @@ const postCreate = async (object, params, callback) => {
 	let isParamsValid = true
 	let messages = []
 	let query = ''
-	let baseQuery = 'INSERT INTO ' + object.schema + '.' + object.name
+	// let baseQuery = 'INSERT INTO ' + object.schema + '.' + object.name
+	let baseQuery = `INSERT INTO ${object.schema}.${object.name}`
 	let tableInfo = ' ('
 
 	for (field of object.fields.filter(f => f.name !== 'id')) {
@@ -252,7 +261,7 @@ const postCreate = async (object, params, callback) => {
 
 	query = query.substring(0, query.length -1)
 	tableInfo = tableInfo.substring(0, tableInfo.length -1) + ')'
-	query = baseQuery + tableInfo + ' VALUES (' + query + ');'
+	query = baseQuery + tableInfo + `VALUES (${query});`
 
 	try {
 		return new Promise((resolve, reject) => {
@@ -264,7 +273,6 @@ const postCreate = async (object, params, callback) => {
 				else {
 					try {
 						const record = await fetchLastInserted(object)
-
 						resolve(record)
 					}
 					catch (err) {
@@ -287,7 +295,7 @@ const postDelete = async (object, id) => {
 	if (!entry.status) {
 		return entry
 	}
-	let query = 'DELETE FROM ' + object.schema + '.' + object.name + ' WHERE ID = :id'
+	const query = `DELETE FROM ${object.schema}.${object.name} WHERE ID = :id`
 	try {
 		return await new Promise((resolve, reject) => {
 			db.once('error', err => reject({ status: false, code: 500, data: err }))
@@ -309,7 +317,7 @@ const postUpdate = async (object, id, params, callback) => {
 	if(!entry.status)
 		return entry
 
-	let query = 'UPDATE ' + object.schema + '.' + object.name + ' SET '
+	let query = `UPDATE ${object.schema}.${object.name} SET `
 	let isParamsValid = true
 	let messages = []
 
@@ -373,7 +381,7 @@ const postUpdate = async (object, id, params, callback) => {
 		}
 
 		// Construction de la requête
-		query += field.name + ' = :' + field.name + ','
+		query += `${field.name} = :${field.name},`
 	}
 
 	if(!isParamsValid) {
@@ -399,7 +407,7 @@ const postUpdate = async (object, id, params, callback) => {
 /** HELPERS **/
 
 const checkUniqueField = (value, object, field) => {
-	const query = 'SELECT COUNT(1) AS "count" FROM ' + object.schema + '.' + object.name + ' WHERE ' + field.name + ' = :value'
+	const query = `SELECT COUNT(1) AS "count" FROM ${object.schema}.${object.name} WHERE ${field.name} = :value`
 	return new Promise((resolve, reject) => {
 		db.query(query, { value: value }, { count: Number }, (err, rows) => {
 			if(!err && rows) {
@@ -457,9 +465,8 @@ const createObject = async (object, params) => {
 
 const createField = async (field) => {
 	const query = 'SELECT O.SCHEMA as "schema", O.NAME as "object", F.NAME as "field", DT.DEFINITION as "datatype", DD.DEFINITION as "definition" FROM CONF.FIELD F INNER JOIN CONF.OBJECT O ON O.ID = F.PARENT_OBJECT INNER JOIN CONF.DATATYPE DT ON F.DATATYPE = DT.ID LEFT JOIN CONF.DATADEFAULT DD ON F.DATADEFAULT = DT.ID WHERE F.ID = :id'
-
 	try {
-		const record = await new Promise(function(resolve, reject) {
+		const record = await new Promise((resolve, reject) => {
 			db.query(query, { id: id }, (err, rows) => {
 				if(!err && rows.length === 1) {
 					resolve(rows[0])
@@ -469,8 +476,9 @@ const createField = async (field) => {
 				}
 			})
 		})
-		const query = 'ALTER TABLE ' + record.schema + '.' + record.object + ' ADD COLUMN ' + record.field + ' ' + record.datatype
-		return await new Promise(function(resolve, reject) {
+
+		const query = `ALTER TABLE ${record.schema}.${record.object} ADD COLUMN ${record.field} ${record.datatype}`
+		return await new Promise((resolve, reject) => {
 			db.once('error', err => reject(false))
 			db.query(query, _ => resolve(true))
 		})
@@ -485,9 +493,11 @@ const updateObject = (originalObject, updatedObject) => {
 	if(originalObject.name !== updatedObject.name || originalObject.schema !== updateObject.schema) {
 		const nameString  = object.fields.filter(f => f.name !== 'id').map(f => f.name).push('id').join(',')
 		const fieldString = object.fields.filter(f => f.name !== 'id').map(f => f.name + ' ' + f.datatype).push('id INTEGER PRIMARY KEY').join(',')
-		let query = 'CREATE TABLE ' + updatedObject.schema + '.' + updatedObject.name + ' (' + fieldString + ')'
-		query = 'INSERT INTO ' + objupdatedObjectect.schema + '.' + updatedObject.name + ' SELECT ' + nameString + ' FROM ' + originalObject.schema + '.' + originalObject.name
-		query = 'DROP TABLE ' + originalObject.schema + '.' + originalObject.name
+		const queries = [
+			`CREATE TABLE ${updatedObject.schema}.${updatedObject.name} (${fieldString})`,
+			`INSERT INTO ${updatedObject.schema}.${updatedObject.name} SELECT ${nameString} FROM ${originalObject.schema}.${originalObject.name}`,
+			`DROP TABLE ${originalObject.schema}.${originalObject.name}`
+		]
 	}
 	else {
 		return true
@@ -502,19 +512,23 @@ const updateField = async (originalField, updatedField) => {
 		// TRANSFER DATA
 		// REMOVE FIELD FROM OLD TABLE
 		const datatype = await getAll(updateField.datatype).data
-		let queries = [
-			'ALTER TABLE ' + [updatedObject.schema, updatedObject.name].join('.') + ' ADD COLUMN ' + [updatedField.name, datatype.definition].join(' '),
-			'ALTER TABLE ' + [originalObject.schema, originalObject.name].join('.') + ' RENAME TO ' + [originalObject.schema, originalObject.name].join('.') + '_old',
-			''
+		const nameString = updatedObject.fields.filter(f => f.name !== 'id').map(f => f.name).push('id').join(',')
+		const fieldString = updatedObject.fields.filter(f => f.name !== 'id').map(f => f.name + ' ' + f.datatype).push('id INTEGER PRIMARY KEY').join(',')
 
+		let queries = [
+			`ALTER TABLE ${updatedObject.schema}.${updatedObject.name} ADD COLUMN ${updatedField.schema} ${datatype.definition}`,
+			`ALTER TABLE ${originalObject.schema}.${originalObject.name} RENAME TO ${originalObject.schema}.${originalObject.name}_old`,
+			'CREATE TABLE ' + originalObject.schema + '.' + originalObject.name + '(' + fieldString + ')',
+			`INSERT INTO ${originalObject.schema}.${originalObject.name} SELECT ${nameString} FROM ${originalObject.schema}.${originalObject.name}_old`,
+			`DROP TABLE ${originalObject.schema}.${originalObject.name}_old`
 		]
+
 	}
 	else {
 		if(originalField.name !== updatedField.name || originalField.datatype !== updatedField.datatype || originalField.datadefault !== updatedField.datadefault) {
 			// RECREATE FIELD
 			let queries = [
-				'ALTER TABLE ' + [updatedObject.schema, updatedObject.name].join('.') + ' RENAME TO ' + [updatedObject.schema, updatedObject.name].join('.') + '_old',
-
+				`ALTER TABLE ${updatedObject.schema}.${updatedObject.name} RENAME TO ${updatedObject.schema}.${updatedObject.name}_old`
 			]
 		}
 	}
@@ -529,17 +543,22 @@ const updateField = async (originalField, updatedField) => {
 }
 
 const deleteObject = (object) => {
-	let query = 'DELETE FROM CONF.FIELD WHERE PARENT_OBJECT = :id'
-	query = 'DROP TABLE ' + object.schema + '.' + object.name
+	const queries = [
+		'DELETE FROM CONF.FIELD WHERE PARENT_OBJECT = :id',
+		`DROP TABLE ${object.schema}.${object.name}`
+	]
 }
 
 const deleteField = (object, fieldId) => {
-	let query = 'ALTER TABLE ' + object.schema + '.' + object.name + ' RENAME TO ' + object.schema + '.' + object.name + '_old'
 	const nameString  = object.fields.filter(f => f.id !== fieldId && f.name !== 'id').map(f => f.name).push('id').join(',')
 	const fieldString = object.fields.filter(f => f.id !== fieldId && f.name !== 'id').map(f => f.name + ' ' + f.datatype).push('id INTEGER PRIMARY KEY').join(',')
-	query = 'CREATE TABLE ' + object.schema + '.' + object.name + ' (' + fieldString + ')'
-	query = 'INSERT INTO ' + object.schema + '.' + object.name + ' SELECT ' + nameString + ' FROM ' + object.schema + '.' + object.name + '_old';
-	query = 'DROP TABLE ' + object.schema + '.' + object.name + '_old'
+
+	const queries = [
+		`ALTER TABLE ${object.schema}.${object.name} RENAME TO ${object.schema}.${object.name}_old`,
+		`CREATE TABLE ${object.schema}.${object.name} (${fieldString})`,
+		`INSERT INTO ${object.schema}.${object.name} SELECT ${nameString} FROM ${object.schema}.${object.name}_old`,
+		`DROP TABLE ${object.schema}.${object.name}_old`
+	]
 }
 
 

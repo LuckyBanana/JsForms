@@ -23,35 +23,30 @@ export default class Wrapper extends React.Component {
   }
 
   getViewObjects() {
-    GET('/init')
-      .then((data) => {
-        if(data.msg === 'OK') {
+    GET('/api/init')
+      .then(res => {
           let activeObject = null
-          data.obj.forEach(object => {
+          res.data.forEach(object => {
             if(object.default === true) {
               activeObject = object.id
             }
           })
           this.setState({
             activeObject: activeObject,
-            viewObjects: data.obj
+            viewObjects: res.data
           })
-        }
-        else {
-          console.error(data.obj)
-        }
-      })
+        })
       .catch((err) => {
         console.error(err)
       })
   }
 
   getUsedGroups() {
-    GET('/api/get/objectgroup')
-      .then(data => {
+    GET('/api/groups')
+      .then(res => {
         const groups = {}
-        for (let i in data) {
-          const gpData = data[i]
+        for (let i in res.data) {
+          const gpData = res.data[i]
           const gp = {
             definition: gpData,
             items: []

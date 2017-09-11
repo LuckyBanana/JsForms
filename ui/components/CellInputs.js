@@ -211,7 +211,8 @@ export class DropdownInputCell extends React.Component {
   }
 
   getReferencedObjectDefinition() {
-    GET('/api/init/view/' + this.props.field.referencedObject)
+    console.log(this.props.field);
+    GET('/api/init/' + this.props.field.referencedObject)
       .then(data => {
         if(data.msg === 'OK') {
           let referencedField = {}
@@ -239,7 +240,7 @@ export class DropdownInputCell extends React.Component {
   }
 
   getOptions(referencedObjectApiUrl, referencedField) {
-    GET('/api/get' + referencedObjectApiUrl)
+    GET('/api' + referencedObjectApiUrl)
       .then(data => {
         this.props.handleChange(this.props.field.id, data[0].id)
         const cols = data.map(col =>

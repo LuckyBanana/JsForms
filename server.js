@@ -207,7 +207,6 @@ const startServer = (configFile) => {
 
 	const DbLib = require(configFile.databaseLib)
 
-
 	DbLib.openDb(configFile.databaseSystem, config)
 	app.use(helmet())
 	app.use(compress())
@@ -270,23 +269,24 @@ const startServer = (configFile) => {
 	/** ROUTES **/
 
 	loadCustomRoutes(app, configFile)
+	app.use('/', require('./routes/ui'))
 	app.use('/api', require('./routes/main'))
+
 	app.use((err, req, res, next) => {
 		res.status(err.status || 500).send({ status: 'error', message: err.message })
 	})
 	if (app.get('env') === 'development') {
-  app.use((err, req, res, next) => {
-    const { code, data } = api.error({ message: err.message, error: err }, err.status || 500)
-    res.status(code).send(data)
-  })
-}
+	  app.use((err, req, res, next) => {
+	    const { code, data } = api.error({ message: err.message, error: err }, err.status || 500)
+	    res.status(code).send(data)
+	  })
+	}
 
-app.use((err, req, res, next) => {
-  const { code, data } = api.error(err.message, err.status || 500)
-  res.status(code).send(data)
-})
+	app.use((err, req, res, next) => {
+	  const { code, data } = api.error(err.message, err.status || 500)
+	  res.status(code).send(data)
+	})
 
-	// require('./routes/main.js')({app: app, passport: passport, dblib: DbLib, conf: configFile, storage: releases})
 }
 
 const loadConfigFile = _ => {

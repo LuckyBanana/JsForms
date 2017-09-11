@@ -40,7 +40,7 @@ export default class NavbarResp extends React.Component {
   }
 
   componentDidMount() {
-    this.getName()
+    // this.getName()
   }
 
   render() {

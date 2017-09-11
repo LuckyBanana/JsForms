@@ -11,7 +11,8 @@ const router = express.Router()
 /** ROUTE VALIDATION **/
 
 // MIDDLEWARE CHECKING IF AUTHENTICATED
-const auth = jwt({ secret: 'jsforms' })
+// const auth = jwt({ secret: 'jsforms' })
+const auth = (req, res, next) => { next() }
 
 // MIDDLEWARE CHECKING IF REQUESTED ROUTE EXISTS
 const isValidRoute = (req, res, next) => {
@@ -51,9 +52,9 @@ const parseId = (req, res, next) => {
 
 // router.get(/\/([a-z]+)\/?([0-9]+?)/ig, (req, res) => {
 // router.get(/^\/([a-z]+)\/?([0-9]+)?\/?([a-z]+)?(?:\/(?=$))?$/ig, (req, res) => {
-router.get('/:obj[a-z]+', (req, res) => {
-	res.send(req.params)
-})
+// router.get('/:obj[a-z]+', (req, res) => {
+// 	res.send(req.params)
+// })
 
 router.post('/authenticate', (req, res) => {
 	DbLib.authenticateJWT(req.body.username, req.body.password, rst => {
@@ -63,8 +64,9 @@ router.post('/authenticate', (req, res) => {
 })
 
 router.get('/init/:id?', parseId, (req, res) => {
-	DbLib.getViewObjects({ prod: false, id: req.params.id }, data => {
-		res.send(data)
+	DbLib.getViewObjects({ prod: false, id: req.params.id }, rst => {
+		const { code, data } = rst
+		res.status(code).send(data)
 	})
 })
 

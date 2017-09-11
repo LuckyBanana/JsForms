@@ -1,4 +1,4 @@
-const _ = require('js-common-utils')
+// const _ = require('js-common-utils')
 const jwt = require('jsonwebtoken')
 
 const api = require('../../utils/api')
@@ -74,6 +74,7 @@ const getAll = async (object, params) => {
 		})
 	})
 
+
 	join = rows.filter(row => row !== '').length > 0
 	// for (row of rows) {
 	// 	if(row.join != '') {
@@ -84,7 +85,15 @@ const getAll = async (object, params) => {
 	// const dataMap = {}
 	fieldString = rows.map(row => `${row.field} AS ${row.name}`).join(',')
 	joinString = rows.filter(row => row.join !== '').map(row => `${row.join}`).join(' ')
-	const dataMap = rows.reduce((acc, row) => { acc[row.name] = eval(row.type); return acc; }, {})
+	const dataMap = rows.reduce((acc, row) => {
+		try {
+			acc[row.name] = eval(row.type)
+		}
+		catch(e) {
+			acc[row.name] = String
+		}
+		return acc
+	}, {})
 
 
 	// for (row of rows) {
@@ -213,7 +222,7 @@ const postCreate = async (object, params, callback) => {
 				}
 			}
 			catch(e) {
-				console.log(e)
+				console.error(e)
 				continue
 			}
 		}
@@ -358,7 +367,7 @@ const postUpdate = async (object, id, params, callback) => {
 				}
 			}
 			catch(e) {
-				console.log(e)
+				console.error(e)
 				continue
 			}
 		}
@@ -1034,7 +1043,7 @@ const SCHEMA_TYPES = {
 	}
 }
 
-exports.getViewObjects = function (params, callback) {
+exports.getViewObjects = (params, callback) => {
 	if (arguments.length === 1) {
 		if (params instanceof Function) {
 			callback = params;

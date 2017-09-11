@@ -21,9 +21,9 @@ export default class TablePanel extends React.Component {
   }
 
   getData(page) {
-    GET('/api/limit' + this.props.definition.apiUrl + '/' + page)
-      .then(json => {
-        var data = json.map(obj => {
+    GET('/api' + this.props.definition.apiUrl + '?size=20&page=' + page)
+      .then(res => {
+        var data = res.data.map(obj => {
           obj.editMode = false
           return obj
         })

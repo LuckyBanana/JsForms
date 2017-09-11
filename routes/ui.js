@@ -1,4 +1,8 @@
 /** SERVE UI **/
+const path = require('path')
+const express = require('express')
+const config = require('config')
+const router = express.Router()
 
 router.get('/dev', (req, res) => {
 	res.sendFile(path.join(__dirname, '..', 'views', 'index.html'))
@@ -15,3 +19,5 @@ else {
 		res.sendFile(path.join(__dirname, '..', 'views', 'index.html'))
 	})
 }
+
+module.exports = router

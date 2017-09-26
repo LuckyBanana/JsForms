@@ -7,6 +7,8 @@ db/storage_*.db
 node_modules
 uploads/releases/*
 
+bin/sqlite3.exe
+
 libs/custom/*
 !libs/custom/custom.js
 
